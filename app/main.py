@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-import logging
+﻿from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,9 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.services.auth import AuthService
 
 configure_logging()
-logger = logging.getLogger(__name__)
 
 
 def create_app() -> FastAPI:
@@ -21,6 +19,9 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         debug=settings.debug,
     )
+
+    app.state.settings = settings
+    app.state.auth_service = AuthService(settings)
 
     app.add_middleware(
         CORSMiddleware,
@@ -39,9 +40,7 @@ def create_app() -> FastAPI:
             "status": "ok",
         }
 
-    logger.info("Sakhi AI application created")
     return app
 
 
 app = create_app()
-

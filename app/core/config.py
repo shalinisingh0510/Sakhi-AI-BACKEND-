@@ -1,8 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = False
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    secret_key: SecretStr = Field(default=SecretStr("dev-secret-change-me"))
+    access_token_minutes: int = 60
+    refresh_token_days: int = 7
 
     model_config = SettingsConfigDict(
         env_prefix="SAKHI_",
@@ -31,6 +34,14 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return [str(origin).strip() for origin in value if str(origin).strip()]
         return ["http://localhost:3000"]
+
+    @field_validator("access_token_minutes", "refresh_token_days", mode="before")
+    @classmethod
+    def parse_positive_int(cls, value: object) -> int:
+        parsed_value = int(value)
+        if parsed_value <= 0:
+            raise ValueError("Token lifetimes must be positive.")
+        return parsed_value
 
 
 @lru_cache(maxsize=1)
