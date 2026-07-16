@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import RLock
+from typing import Protocol
 from uuid import uuid4
 
 from app.core.config import Settings
@@ -41,6 +42,20 @@ class StoredUser:
 
     def to_public_user(self) -> PublicUser:
         return PublicUser.model_validate(self)
+
+
+class AuthStoreProtocol(Protocol):
+    def create_user(self, *, name: str, email: str, password: str, role: str) -> StoredUser:
+        ...
+
+    def get_by_email(self, email: str) -> StoredUser | None:
+        ...
+
+    def get_by_id(self, user_id: str) -> StoredUser | None:
+        ...
+
+    def authenticate(self, *, email: str, password: str) -> StoredUser:
+        ...
 
 
 @dataclass(slots=True)
@@ -100,7 +115,7 @@ class InMemoryAuthStore:
 
 
 class AuthService:
-    def __init__(self, settings: Settings, store: InMemoryAuthStore | None = None) -> None:
+    def __init__(self, settings: Settings, store: AuthStoreProtocol | None = None) -> None:
         self._settings = settings
         self._store = store or InMemoryAuthStore()
 
@@ -117,7 +132,10 @@ class AuthService:
         return self._create_session(user)
 
     def login_user(self, *, email: str, password: str) -> AuthSession:
-        user = self._store.authenticate(email=email, password=password)
+        try:
+            user = self._store.authenticate(email=email, password=password)
+        except (InvalidCredentialsError, ValueError) as exc:
+            raise InvalidCredentialsError(str(exc)) from exc
         return self._create_session(user)
 
     def refresh_session(self, *, refresh_token: str) -> AuthSession:

@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -12,6 +13,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = False
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    database_path: Path = Field(default=Path("sakhi_ai.sqlite3"))
     secret_key: SecretStr = Field(default=SecretStr("dev-secret-change-me"))
     access_token_minutes: int = 60
     refresh_token_days: int = 7
@@ -34,6 +36,18 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return [str(origin).strip() for origin in value if str(origin).strip()]
         return ["http://localhost:3000"]
+
+    @field_validator("database_path", mode="before")
+    @classmethod
+    def parse_database_path(cls, value: object) -> Path:
+        if value is None:
+            return Path("sakhi_ai.sqlite3")
+        if isinstance(value, Path):
+            return value
+        normalized = str(value).strip()
+        if not normalized:
+            return Path("sakhi_ai.sqlite3")
+        return Path(normalized)
 
     @field_validator("access_token_minutes", "refresh_token_days", mode="before")
     @classmethod

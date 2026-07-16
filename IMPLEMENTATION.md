@@ -2,7 +2,7 @@
 
 ## Current Task
 
-Database integration and persistence models for Sakhi AI.
+User profiles, role management, and broader persistence models.
 
 ## Completed Work
 
@@ -19,7 +19,10 @@ Database integration and persistence models for Sakhi AI.
 - Added in-memory user storage with session issuance for register, login, and refresh flows.
 - Added authenticated profile and admin-only routes with role-based authorization checks.
 - Added integration tests for registration, login, refresh, profile lookup, and role enforcement.
-- Updated this implementation log after completing the authentication and authorization foundation.
+- Added a SQLite-backed auth persistence layer with schema bootstrap and reusable lookup methods.
+- Added a configurable database path setting and wired app startup to use the SQLite store.
+- Added an integration test that verifies users survive across app instances when the same database file is reused.
+- Updated this implementation log after completing the persistence foundation.
 
 ## Files Created or Modified
 
@@ -40,6 +43,8 @@ Database integration and persistence models for Sakhi AI.
 - `app/core/config.py`
 - `app/core/logging.py`
 - `app/core/security.py`
+- `app/db/__init__.py`
+- `app/db/auth_store.py`
 - `app/main.py`
 - `app/schemas/__init__.py`
 - `app/schemas/auth.py`
@@ -58,17 +63,17 @@ Database integration and persistence models for Sakhi AI.
 - Logging configuration placeholder for future structured logging.
 - JWT-style signed access and refresh tokens using HMAC-SHA256.
 - Password hashing with PBKDF2 and per-user salts.
-- In-memory user registration, login, refresh, and profile lookup.
+- SQLite-backed user registration, login, refresh, and profile lookup.
 - Role-based authorization helpers and an admin-only example endpoint.
-- Automated test coverage for health and auth flows.
+- Automated test coverage for health, auth, and persistence flows.
 
 ## Current Progress
 
-- Backend project now has a working authentication and authorization foundation and is ready for persistence work.
+- Authentication now persists through SQLite instead of only living in memory.
+- The next step is to expand the database-backed model layer beyond users and auth sessions.
 
 ## Remaining Work
 
-- Database integration and persistence models.
 - User profiles and role management.
 - AI conversation services.
 - Lessons and educational content APIs.
