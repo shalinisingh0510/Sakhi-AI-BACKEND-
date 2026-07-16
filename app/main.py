@@ -6,10 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
-from app.db import SQLiteAuthStore, SQLiteConversationStore, SQLiteLessonStore, SQLiteProgressStore
+from app.db import SQLiteAuthStore, SQLiteConversationStore, SQLiteLessonStore, SQLiteNotificationStore, SQLiteProgressStore
 from app.services.ai import AIService
 from app.services.auth import AuthService, AuthStoreProtocol
 from app.services.lessons import LessonService
+from app.services.notifications import NotificationService
 from app.services.progress import ProgressService
 
 configure_logging()
@@ -34,8 +35,15 @@ def create_app(
     app.state.ai_service = AIService(settings, store=app.state.ai_store)
     app.state.lesson_store = SQLiteLessonStore(settings.database_path)
     app.state.lesson_service = LessonService(settings, store=app.state.lesson_store)
+    app.state.notification_store = SQLiteNotificationStore(settings.database_path)
+    app.state.notification_service = NotificationService(settings, store=app.state.notification_store)
     app.state.progress_store = SQLiteProgressStore(settings.database_path)
-    app.state.progress_service = ProgressService(settings, store=app.state.progress_store, lesson_service=app.state.lesson_service)
+    app.state.progress_service = ProgressService(
+        settings,
+        store=app.state.progress_store,
+        lesson_service=app.state.lesson_service,
+        notification_service=app.state.notification_service,
+    )
 
     app.add_middleware(
         CORSMiddleware,

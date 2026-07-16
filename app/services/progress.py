@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Protocol
-
 from app.core.config import Settings
 from app.schemas.lesson import LessonSummary
 from app.schemas.progress import LessonProgressItem, ProgressOverview, ProgressStatus
 from app.services.lessons import LessonService
+from app.services.notifications import NotificationService
+
+# This module is intentionally small to avoid circular imports.
+# The actual service logic is implemented in the store-backed classes.
+
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Protocol
 
 DEFAULT_PROGRESS_PERCENT = 0
 IN_PROGRESS_DEFAULT_PERCENT = 50
@@ -59,10 +63,17 @@ class ProgressStoreProtocol(Protocol):
 
 
 class ProgressService:
-    def __init__(self, settings: Settings, store: ProgressStoreProtocol, lesson_service: LessonService) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        store: ProgressStoreProtocol,
+        lesson_service: LessonService,
+        notification_service: NotificationService | None = None,
+    ) -> None:
         self._settings = settings
         self._store = store
         self._lesson_service = lesson_service
+        self._notification_service = notification_service
 
     def list_progress(self, *, user_id: str) -> list[LessonProgressItem]:
         records = self._store.list_progress(user_id=user_id)
@@ -85,6 +96,7 @@ class ProgressService:
         notes: str | None = None,
     ) -> LessonProgressItem:
         lesson = self._lesson_service.get_lesson(slug=lesson_slug, published_only=False)
+        existing_record = self._store.get_progress(user_id=user_id, lesson_id=lesson.id)
         normalized_status = self._normalize_status(status)
         normalized_progress = self._normalize_progress_percent(normalized_status, progress_percent)
         normalized_notes = notes.strip() if notes is not None else None
@@ -98,6 +110,18 @@ class ProgressService:
             progress_percent=normalized_progress,
             notes=normalized_notes,
         )
+
+        if (
+            self._notification_service is not None
+            and normalized_status == "completed"
+            and (existing_record is None or existing_record.status != "completed")
+        ):
+            self._notification_service.create_lesson_completion_notification(
+                user_id=user_id,
+                lesson_title=lesson.title,
+                lesson_slug=lesson.slug,
+            )
+
         return self._to_item(record)
 
     def summarize_progress(self, *, user_id: str) -> ProgressOverview:

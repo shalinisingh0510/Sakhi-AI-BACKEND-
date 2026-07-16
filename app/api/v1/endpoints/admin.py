@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.dependencies import get_auth_service, get_lesson_service, require_roles
+from app.api.dependencies import get_auth_service, get_lesson_service, get_notification_service, require_roles
 from app.schemas.auth import PublicUser, UpdateRoleRequest
 from app.schemas.lesson import CreateLessonRequest, LessonDetail, LessonSummary, UpdateLessonRequest
+from app.schemas.notification import CreateNotificationRequest, NotificationDispatchResult
 from app.services.auth import AuthService, InvalidRoleError, StoredUser, UserNotFoundError
 from app.services.lessons import DuplicateLessonSlugError, InvalidLessonContentError, LessonNotFoundError, LessonService
+from app.services.notifications import NotificationService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -43,6 +45,29 @@ def update_user_role(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
     return user.to_public_user()
+
+
+@router.post("/notifications", response_model=NotificationDispatchResult, status_code=status.HTTP_201_CREATED)
+def create_notification(
+    payload: CreateNotificationRequest,
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    auth_service: AuthService = Depends(get_auth_service),
+    notification_service: NotificationService = Depends(get_notification_service),
+) -> NotificationDispatchResult:
+    users = auth_service.list_users()
+    if payload.recipient_user_id is not None:
+        users = [user for user in users if user.id == payload.recipient_user_id]
+        if not users:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target user not found.")
+
+    notifications = notification_service.create_notifications_for_users(
+        user_ids=[user.id for user in users],
+        title=payload.title,
+        body=payload.body,
+        notification_type=payload.notification_type,
+        metadata=payload.metadata,
+    )
+    return NotificationDispatchResult(created_count=len(notifications), notifications=notifications)
 
 
 @router.get("/lessons", response_model=list[LessonSummary])

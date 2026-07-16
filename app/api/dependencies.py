@@ -5,6 +5,7 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from app.services.ai import AIService
 from app.services.auth import AuthService, InvalidTokenError, StoredUser
 from app.services.lessons import LessonService
+from app.services.notifications import NotificationService
 from app.services.progress import ProgressService
 
 
@@ -18,6 +19,10 @@ def get_ai_service(request: Request) -> AIService:
 
 def get_lesson_service(request: Request) -> LessonService:
     return request.app.state.lesson_service
+
+
+def get_notification_service(request: Request) -> NotificationService:
+    return request.app.state.notification_service
 
 
 def get_progress_service(request: Request) -> ProgressService:

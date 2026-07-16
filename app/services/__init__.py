@@ -31,9 +31,17 @@ from .lessons import (
     LessonStoreProtocol,
     StoredLesson,
 )
+from .notifications import (
+    InvalidNotificationError,
+    NotificationError,
+    NotificationNotFoundError,
+    NotificationService,
+    NotificationStoreProtocol,
+    StoredNotification,
+)
 from .progress import (
-    DEFAULT_PROGRESS_PERCENT,
     COMPLETED_PROGRESS_PERCENT,
+    DEFAULT_PROGRESS_PERCENT,
     IN_PROGRESS_DEFAULT_PERCENT,
     InvalidProgressError,
     ProgressError,
@@ -63,6 +71,7 @@ __all__ = [
     "InvalidConversationMessageError",
     "InvalidCredentialsError",
     "InvalidLessonContentError",
+    "InvalidNotificationError",
     "InvalidProfileUpdateError",
     "InvalidProgressError",
     "InvalidRoleError",
@@ -71,6 +80,10 @@ __all__ = [
     "LessonNotFoundError",
     "LessonService",
     "LessonStoreProtocol",
+    "NotificationError",
+    "NotificationNotFoundError",
+    "NotificationService",
+    "NotificationStoreProtocol",
     "ProgressError",
     "ProgressNotFoundError",
     "ProgressOverview",
@@ -80,6 +93,7 @@ __all__ = [
     "StoredConversationMessage",
     "StoredLesson",
     "StoredLessonProgress",
+    "StoredNotification",
     "StoredUser",
     "UserNotFoundError",
 ]
