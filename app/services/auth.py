@@ -8,11 +8,12 @@ from uuid import uuid4
 
 from app.core.config import Settings
 from app.core.security import build_token_claims, decode_token, encode_token, hash_password, verify_password
-from app.schemas.auth import PublicUser
+from app.schemas.auth import PublicUser, SUPPORTED_LANGUAGES
 
 DEFAULT_PREFERRED_LANGUAGE = "english"
 REGISTRABLE_ROLES = {"user", "admin"}
 SUPPORTED_ROLES = {"user", "admin", "moderator"}
+SUPPORTED_LANGUAGE_SET = {language.lower() for language in SUPPORTED_LANGUAGES}
 
 
 class AuthError(Exception):
@@ -171,7 +172,10 @@ class InMemoryAuthStore:
                 user.name = normalized_name
 
             if preferred_language is not None:
-                user.preferred_language = preferred_language.strip().lower()
+                normalized_language = preferred_language.strip().lower()
+                if normalized_language not in SUPPORTED_LANGUAGE_SET:
+                    raise InvalidProfileUpdateError("Unsupported preferred language.")
+                user.preferred_language = normalized_language
 
             self._users_by_email[user.email] = user
             return user
@@ -233,20 +237,7 @@ class AuthService:
             raise InvalidProfileUpdateError("Name cannot be empty.")
 
         normalized_language = None if preferred_language is None else preferred_language.strip().lower()
-        if normalized_language is not None and not normalized_language:
-            raise InvalidProfileUpdateError("Preferred language cannot be empty.")
-        if normalized_language is not None and normalized_language not in {
-            "english",
-            "hindi",
-            "bengali",
-            "marathi",
-            "tamil",
-            "telugu",
-            "kannada",
-            "gujarati",
-            "punjabi",
-            "odia",
-        }:
+        if normalized_language is not None and normalized_language not in SUPPORTED_LANGUAGE_SET:
             raise InvalidProfileUpdateError("Unsupported preferred language.")
 
         return self._store.update_user_profile(
@@ -287,6 +278,10 @@ class AuthService:
         user = self._store.get_by_id(user_id)
         if user is None:
             raise InvalidTokenError("Token references an unknown user.")
+
+        token_role = str(claims.get("role", "")).strip().lower()
+        if token_role and token_role != user.role.strip().lower():
+            raise InvalidTokenError("Token role no longer matches the current user record.")
         return user
 
     def _create_session(self, user: StoredUser) -> AuthSession:

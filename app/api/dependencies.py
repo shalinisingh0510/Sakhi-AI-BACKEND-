@@ -2,11 +2,16 @@
 
 from fastapi import Depends, Header, HTTPException, Request, status
 
+from app.services.ai import AIService
 from app.services.auth import AuthService, InvalidTokenError, StoredUser
 
 
 def get_auth_service(request: Request) -> AuthService:
     return request.app.state.auth_service
+
+
+def get_ai_service(request: Request) -> AIService:
+    return request.app.state.ai_service
 
 
 def get_current_user(

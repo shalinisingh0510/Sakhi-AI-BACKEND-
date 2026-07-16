@@ -7,13 +7,7 @@ from threading import RLock
 from uuid import uuid4
 
 from app.core.security import hash_password, verify_password
-from app.services.auth import (
-    DEFAULT_PREFERRED_LANGUAGE,
-    DuplicateEmailError,
-    InvalidCredentialsError,
-    StoredUser,
-    UserNotFoundError,
-)
+from app.services.auth import DuplicateEmailError, InvalidCredentialsError, StoredUser, UserNotFoundError
 
 
 class SQLiteAuthStore:
@@ -53,7 +47,7 @@ class SQLiteAuthStore:
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=timezone.utc)
 
-        preferred_language = row["preferred_language"] if "preferred_language" in row.keys() else DEFAULT_PREFERRED_LANGUAGE
+        preferred_language = row["preferred_language"] if "preferred_language" in row.keys() else "english"
         return StoredUser(
             id=row["id"],
             name=row["name"],
@@ -71,7 +65,7 @@ class SQLiteAuthStore:
         email: str,
         password: str,
         role: str,
-        preferred_language: str = DEFAULT_PREFERRED_LANGUAGE,
+        preferred_language: str = "english",
     ) -> StoredUser:
         normalized_email = email.strip().lower()
         normalized_role = role.strip().lower()

@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
-from app.db import SQLiteAuthStore
+from app.db import SQLiteAuthStore, SQLiteConversationStore
+from app.services.ai import AIService
 from app.services.auth import AuthService, AuthStoreProtocol
 
 configure_logging()
@@ -27,6 +28,8 @@ def create_app(
     app.state.settings = settings
     app.state.auth_store = auth_store or SQLiteAuthStore(settings.database_path)
     app.state.auth_service = AuthService(settings, store=app.state.auth_store)
+    app.state.ai_store = SQLiteConversationStore(settings.database_path)
+    app.state.ai_service = AIService(settings, store=app.state.ai_store)
 
     app.add_middleware(
         CORSMiddleware,

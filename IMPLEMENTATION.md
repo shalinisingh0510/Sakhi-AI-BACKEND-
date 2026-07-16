@@ -2,7 +2,7 @@
 
 ## Current Task
 
-User profiles and role management.
+Lessons and educational content APIs.
 
 ## Completed Work
 
@@ -24,7 +24,9 @@ User profiles and role management.
 - Added an integration test that verifies users survive across app instances when the same database file is reused.
 - Added profile update support, preferred language storage, and admin role management APIs.
 - Added tests for user profile updates, persistent login state, admin user listing, and role changes.
-- Updated this implementation log after completing the profile and role-management step.
+- Added AI conversation schemas, a SQLite-backed conversation store, safe reply generation, and authenticated conversation endpoints.
+- Added tests for conversation creation, message exchange, persistence, and private conversation access.
+- Updated this implementation log after completing the AI conversation step.
 
 ## Files Created or Modified
 
@@ -39,20 +41,25 @@ User profiles and role management.
 - `app/api/v1/endpoints/__init__.py`
 - `app/api/v1/endpoints/admin.py`
 - `app/api/v1/endpoints/auth.py`
+- `app/api/v1/endpoints/conversations.py`
 - `app/api/v1/endpoints/health.py`
 - `app/core/__init__.py`
 - `app/core/config.py`
 - `app/core/logging.py`
 - `app/core/security.py`
 - `app/db/__init__.py`
+- `app/db/ai_store.py`
 - `app/db/auth_store.py`
 - `app/main.py`
 - `app/schemas/__init__.py`
+- `app/schemas/ai.py`
 - `app/schemas/auth.py`
 - `app/services/__init__.py`
+- `app/services/ai.py`
 - `app/services/auth.py`
 - `tests/__init__.py`
 - `tests/test_auth.py`
+- `tests/test_conversations.py`
 - `tests/test_health.py`
 - `pyproject.toml`
 
@@ -68,16 +75,17 @@ User profiles and role management.
 - SQLite-backed user registration, login, refresh, profile lookup, and profile updates.
 - Preferred language storage for multilingual user preferences.
 - Role-based authorization helpers and admin-only user listing and role update endpoints.
-- Automated test coverage for health, auth, persistence, profile, and role-management flows.
+- SQLite-backed AI conversation creation, message exchange, history retrieval, and private ownership checks.
+- Safe, rule-based educational AI responses with medical caution messaging.
+- Automated test coverage for health, auth, persistence, profile, role-management, and conversation flows.
 
 ## Current Progress
 
-- User profile fields and role updates are now backed by SQLite and exposed through the API.
-- The next step is to expand beyond auth and profiles into AI conversation and content modules.
+- AI conversation services are now available through the API and persist in SQLite.
+- The next step is to expand into lessons and educational content APIs.
 
 ## Remaining Work
 
-- AI conversation services.
 - Lessons and educational content APIs.
 - Multilingual content support.
 - Progress tracking.

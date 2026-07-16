@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     debug: bool = False
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     database_path: Path = Field(default=Path("sakhi_ai.sqlite3"))
+    ai_provider_name: str = "rule-based"
+    conversation_history_limit: int = 8
     secret_key: SecretStr = Field(default=SecretStr("dev-secret-change-me"))
     access_token_minutes: int = 60
     refresh_token_days: int = 7
@@ -49,12 +51,12 @@ class Settings(BaseSettings):
             return Path("sakhi_ai.sqlite3")
         return Path(normalized)
 
-    @field_validator("access_token_minutes", "refresh_token_days", mode="before")
+    @field_validator("access_token_minutes", "refresh_token_days", "conversation_history_limit", mode="before")
     @classmethod
     def parse_positive_int(cls, value: object) -> int:
         parsed_value = int(value)
         if parsed_value <= 0:
-            raise ValueError("Token lifetimes must be positive.")
+            raise ValueError("Numeric settings must be positive.")
         return parsed_value
 
 

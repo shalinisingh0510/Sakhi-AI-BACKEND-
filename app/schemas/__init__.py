@@ -1,4 +1,5 @@
-﻿from .auth import (
+﻿from .ai import ConversationDetail, ConversationMessage, ConversationSummary, CreateConversationRequest, SendMessageRequest
+from .auth import (
     AuthResponse,
     LoginRequest,
     PublicUser,
@@ -10,10 +11,15 @@
 
 __all__ = [
     "AuthResponse",
+    "ConversationDetail",
+    "ConversationMessage",
+    "ConversationSummary",
+    "CreateConversationRequest",
     "LoginRequest",
     "PublicUser",
     "RefreshRequest",
     "RegisterRequest",
+    "SendMessageRequest",
     "UpdateProfileRequest",
     "UpdateRoleRequest",
 ]
