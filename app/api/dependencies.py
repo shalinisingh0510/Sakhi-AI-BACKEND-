@@ -4,6 +4,7 @@ from fastapi import Depends, Header, HTTPException, Request, status
 
 from app.services.ai import AIService
 from app.services.auth import AuthService, InvalidTokenError, StoredUser
+from app.services.lessons import LessonService
 
 
 def get_auth_service(request: Request) -> AuthService:
@@ -12,6 +13,10 @@ def get_auth_service(request: Request) -> AuthService:
 
 def get_ai_service(request: Request) -> AIService:
     return request.app.state.ai_service
+
+
+def get_lesson_service(request: Request) -> LessonService:
+    return request.app.state.lesson_service
 
 
 def get_current_user(

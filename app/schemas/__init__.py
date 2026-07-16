@@ -8,6 +8,7 @@ from .auth import (
     UpdateProfileRequest,
     UpdateRoleRequest,
 )
+from .lesson import CreateLessonRequest, LessonDetail, LessonSection, LessonSummary, UpdateLessonRequest
 
 __all__ = [
     "AuthResponse",
@@ -15,11 +16,16 @@ __all__ = [
     "ConversationMessage",
     "ConversationSummary",
     "CreateConversationRequest",
+    "CreateLessonRequest",
+    "LessonDetail",
+    "LessonSection",
+    "LessonSummary",
     "LoginRequest",
     "PublicUser",
     "RefreshRequest",
     "RegisterRequest",
     "SendMessageRequest",
+    "UpdateLessonRequest",
     "UpdateProfileRequest",
     "UpdateRoleRequest",
 ]

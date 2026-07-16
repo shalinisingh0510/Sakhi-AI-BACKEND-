@@ -1,4 +1,14 @@
-﻿from .auth import (
+﻿from .ai import (
+    AIService,
+    ConversationAccessDeniedError,
+    ConversationError,
+    ConversationNotFoundError,
+    ConversationStoreProtocol,
+    InvalidConversationMessageError,
+    StoredConversation,
+    StoredConversationMessage,
+)
+from .auth import (
     AuthError,
     AuthSession,
     AuthService,
@@ -12,18 +22,42 @@
     StoredUser,
     UserNotFoundError,
 )
+from .lessons import (
+    DuplicateLessonSlugError,
+    InvalidLessonContentError,
+    LessonError,
+    LessonNotFoundError,
+    LessonService,
+    LessonStoreProtocol,
+    StoredLesson,
+)
 
 __all__ = [
+    "AIService",
     "AuthError",
     "AuthSession",
     "AuthService",
     "AuthStoreProtocol",
+    "ConversationAccessDeniedError",
+    "ConversationError",
+    "ConversationNotFoundError",
+    "ConversationStoreProtocol",
     "DuplicateEmailError",
+    "DuplicateLessonSlugError",
     "InMemoryAuthStore",
+    "InvalidConversationMessageError",
     "InvalidCredentialsError",
+    "InvalidLessonContentError",
     "InvalidProfileUpdateError",
     "InvalidRoleError",
     "InvalidTokenError",
+    "LessonError",
+    "LessonNotFoundError",
+    "LessonService",
+    "LessonStoreProtocol",
+    "StoredConversation",
+    "StoredConversationMessage",
+    "StoredLesson",
     "StoredUser",
     "UserNotFoundError",
 ]
