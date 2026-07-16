@@ -2,7 +2,7 @@
 
 ## Current Task
 
-User profiles, role management, and broader persistence models.
+User profiles and role management.
 
 ## Completed Work
 
@@ -22,14 +22,15 @@ User profiles, role management, and broader persistence models.
 - Added a SQLite-backed auth persistence layer with schema bootstrap and reusable lookup methods.
 - Added a configurable database path setting and wired app startup to use the SQLite store.
 - Added an integration test that verifies users survive across app instances when the same database file is reused.
-- Updated this implementation log after completing the persistence foundation.
+- Added profile update support, preferred language storage, and admin role management APIs.
+- Added tests for user profile updates, persistent login state, admin user listing, and role changes.
+- Updated this implementation log after completing the profile and role-management step.
 
 ## Files Created or Modified
 
-- `.gitignore`
 - `.env.example`
+- `.gitignore`
 - `IMPLEMENTATION.md`
-- `pyproject.toml`
 - `app/__init__.py`
 - `app/api/__init__.py`
 - `app/api/dependencies.py`
@@ -53,6 +54,7 @@ User profiles, role management, and broader persistence models.
 - `tests/__init__.py`
 - `tests/test_auth.py`
 - `tests/test_health.py`
+- `pyproject.toml`
 
 ## Functionality Implemented
 
@@ -63,18 +65,18 @@ User profiles, role management, and broader persistence models.
 - Logging configuration placeholder for future structured logging.
 - JWT-style signed access and refresh tokens using HMAC-SHA256.
 - Password hashing with PBKDF2 and per-user salts.
-- SQLite-backed user registration, login, refresh, and profile lookup.
-- Role-based authorization helpers and an admin-only example endpoint.
-- Automated test coverage for health, auth, and persistence flows.
+- SQLite-backed user registration, login, refresh, profile lookup, and profile updates.
+- Preferred language storage for multilingual user preferences.
+- Role-based authorization helpers and admin-only user listing and role update endpoints.
+- Automated test coverage for health, auth, persistence, profile, and role-management flows.
 
 ## Current Progress
 
-- Authentication now persists through SQLite instead of only living in memory.
-- The next step is to expand the database-backed model layer beyond users and auth sessions.
+- User profile fields and role updates are now backed by SQLite and exposed through the API.
+- The next step is to expand beyond auth and profiles into AI conversation and content modules.
 
 ## Remaining Work
 
-- User profiles and role management.
 - AI conversation services.
 - Lessons and educational content APIs.
 - Multilingual content support.

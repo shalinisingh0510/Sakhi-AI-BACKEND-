@@ -7,6 +7,18 @@ import re
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+SUPPORTED_LANGUAGES = (
+    "english",
+    "hindi",
+    "bengali",
+    "marathi",
+    "tamil",
+    "telugu",
+    "kannada",
+    "gujarati",
+    "punjabi",
+    "odia",
+)
 
 
 class PublicUser(BaseModel):
@@ -15,7 +27,8 @@ class PublicUser(BaseModel):
     id: str
     name: str
     email: str
-    role: Literal["user", "admin"]
+    role: str
+    preferred_language: str = "english"
     created_at: datetime
 
 
@@ -73,6 +86,37 @@ class LoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(min_length=20)
+
+
+class UpdateProfileRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=100)
+    preferred_language: str | None = Field(default=None, max_length=32)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Name cannot be empty.")
+        return normalized
+
+    @field_validator("preferred_language")
+    @classmethod
+    def normalize_preferred_language(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if not normalized:
+            raise ValueError("Preferred language cannot be empty.")
+        if normalized not in SUPPORTED_LANGUAGES:
+            raise ValueError("Unsupported preferred language.")
+        return normalized
+
+
+class UpdateRoleRequest(BaseModel):
+    role: Literal["user", "admin", "moderator"]
 
 
 class AuthResponse(BaseModel):

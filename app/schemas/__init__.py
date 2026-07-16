@@ -1,4 +1,12 @@
-﻿from .auth import AuthResponse, LoginRequest, PublicUser, RefreshRequest, RegisterRequest
+﻿from .auth import (
+    AuthResponse,
+    LoginRequest,
+    PublicUser,
+    RefreshRequest,
+    RegisterRequest,
+    UpdateProfileRequest,
+    UpdateRoleRequest,
+)
 
 __all__ = [
     "AuthResponse",
@@ -6,4 +14,6 @@ __all__ = [
     "PublicUser",
     "RefreshRequest",
     "RegisterRequest",
+    "UpdateProfileRequest",
+    "UpdateRoleRequest",
 ]

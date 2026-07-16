@@ -6,9 +6,11 @@
     DuplicateEmailError,
     InMemoryAuthStore,
     InvalidCredentialsError,
+    InvalidProfileUpdateError,
     InvalidRoleError,
     InvalidTokenError,
     StoredUser,
+    UserNotFoundError,
 )
 
 __all__ = [
@@ -19,7 +21,9 @@ __all__ = [
     "DuplicateEmailError",
     "InMemoryAuthStore",
     "InvalidCredentialsError",
+    "InvalidProfileUpdateError",
     "InvalidRoleError",
     "InvalidTokenError",
     "StoredUser",
+    "UserNotFoundError",
 ]

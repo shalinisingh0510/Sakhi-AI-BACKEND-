@@ -3,14 +3,23 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import get_auth_service, get_current_user
-from app.schemas.auth import AuthResponse, LoginRequest, PublicUser, RefreshRequest, RegisterRequest
+from app.schemas.auth import (
+    AuthResponse,
+    LoginRequest,
+    PublicUser,
+    RefreshRequest,
+    RegisterRequest,
+    UpdateProfileRequest,
+)
 from app.services.auth import (
     AuthService,
     DuplicateEmailError,
     InvalidCredentialsError,
+    InvalidProfileUpdateError,
     InvalidRoleError,
     InvalidTokenError,
     StoredUser,
+    UserNotFoundError,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -76,3 +85,23 @@ def refresh(
 @router.get("/me", response_model=PublicUser)
 def me(current_user: StoredUser = Depends(get_current_user)) -> PublicUser:
     return current_user.to_public_user()
+
+
+@router.patch("/me", response_model=PublicUser)
+def update_me(
+    payload: UpdateProfileRequest,
+    current_user: StoredUser = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> PublicUser:
+    try:
+        user = auth_service.update_profile(
+            user_id=current_user.id,
+            name=payload.name,
+            preferred_language=payload.preferred_language,
+        )
+    except InvalidProfileUpdateError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except UserNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    return user.to_public_user()

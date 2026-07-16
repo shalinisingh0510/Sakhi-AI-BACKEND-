@@ -10,6 +10,10 @@ from app.core.config import Settings
 from app.core.security import build_token_claims, decode_token, encode_token, hash_password, verify_password
 from app.schemas.auth import PublicUser
 
+DEFAULT_PREFERRED_LANGUAGE = "english"
+REGISTRABLE_ROLES = {"user", "admin"}
+SUPPORTED_ROLES = {"user", "admin", "moderator"}
+
 
 class AuthError(Exception):
     """Base exception for authentication and authorization failures."""
@@ -31,6 +35,14 @@ class InvalidRoleError(AuthError):
     pass
 
 
+class InvalidProfileUpdateError(AuthError):
+    pass
+
+
+class UserNotFoundError(AuthError):
+    pass
+
+
 @dataclass(slots=True)
 class StoredUser:
     id: str
@@ -39,13 +51,22 @@ class StoredUser:
     password_hash: str
     role: str
     created_at: datetime
+    preferred_language: str = DEFAULT_PREFERRED_LANGUAGE
 
     def to_public_user(self) -> PublicUser:
         return PublicUser.model_validate(self)
 
 
 class AuthStoreProtocol(Protocol):
-    def create_user(self, *, name: str, email: str, password: str, role: str) -> StoredUser:
+    def create_user(
+        self,
+        *,
+        name: str,
+        email: str,
+        password: str,
+        role: str,
+        preferred_language: str = DEFAULT_PREFERRED_LANGUAGE,
+    ) -> StoredUser:
         ...
 
     def get_by_email(self, email: str) -> StoredUser | None:
@@ -55,6 +76,21 @@ class AuthStoreProtocol(Protocol):
         ...
 
     def authenticate(self, *, email: str, password: str) -> StoredUser:
+        ...
+
+    def update_user_profile(
+        self,
+        *,
+        user_id: str,
+        name: str | None = None,
+        preferred_language: str | None = None,
+    ) -> StoredUser:
+        ...
+
+    def update_user_role(self, *, user_id: str, role: str) -> StoredUser:
+        ...
+
+    def list_users(self) -> list[StoredUser]:
         ...
 
 
@@ -81,9 +117,11 @@ class InMemoryAuthStore:
         email: str,
         password: str,
         role: str,
+        preferred_language: str = DEFAULT_PREFERRED_LANGUAGE,
     ) -> StoredUser:
         normalized_email = email.strip().lower()
         normalized_role = role.strip().lower()
+        normalized_language = preferred_language.strip().lower()
 
         with self._lock:
             if normalized_email in self._users_by_email:
@@ -96,6 +134,7 @@ class InMemoryAuthStore:
                 password_hash=hash_password(password),
                 role=normalized_role,
                 created_at=datetime.now(timezone.utc),
+                preferred_language=normalized_language,
             )
             self._users_by_id[user.id] = user
             self._users_by_email[normalized_email] = user
@@ -113,6 +152,43 @@ class InMemoryAuthStore:
             raise InvalidCredentialsError("Invalid email or password.")
         return user
 
+    def update_user_profile(
+        self,
+        *,
+        user_id: str,
+        name: str | None = None,
+        preferred_language: str | None = None,
+    ) -> StoredUser:
+        with self._lock:
+            user = self._users_by_id.get(user_id)
+            if user is None:
+                raise UserNotFoundError("User not found.")
+
+            if name is not None:
+                normalized_name = name.strip()
+                if not normalized_name:
+                    raise InvalidProfileUpdateError("Name cannot be empty.")
+                user.name = normalized_name
+
+            if preferred_language is not None:
+                user.preferred_language = preferred_language.strip().lower()
+
+            self._users_by_email[user.email] = user
+            return user
+
+    def update_user_role(self, *, user_id: str, role: str) -> StoredUser:
+        normalized_role = role.strip().lower()
+        with self._lock:
+            user = self._users_by_id.get(user_id)
+            if user is None:
+                raise UserNotFoundError("User not found.")
+            user.role = normalized_role
+            return user
+
+    def list_users(self) -> list[StoredUser]:
+        with self._lock:
+            return sorted(self._users_by_id.values(), key=lambda user: user.created_at)
+
 
 class AuthService:
     def __init__(self, settings: Settings, store: AuthStoreProtocol | None = None) -> None:
@@ -125,7 +201,7 @@ class AuthService:
 
     def register_user(self, *, name: str, email: str, password: str, role: str = "user") -> AuthSession:
         normalized_role = role.strip().lower()
-        if normalized_role not in {"user", "admin"}:
+        if normalized_role not in REGISTRABLE_ROLES:
             raise InvalidRoleError("Unsupported user role.")
 
         user = self._store.create_user(name=name, email=email, password=password, role=normalized_role)
@@ -141,6 +217,52 @@ class AuthService:
     def refresh_session(self, *, refresh_token: str) -> AuthSession:
         user = self.resolve_current_user(refresh_token=refresh_token, token_type="refresh")
         return self._create_session(user)
+
+    def update_profile(
+        self,
+        *,
+        user_id: str,
+        name: str | None = None,
+        preferred_language: str | None = None,
+    ) -> StoredUser:
+        if name is None and preferred_language is None:
+            raise InvalidProfileUpdateError("At least one profile field must be provided.")
+
+        normalized_name = None if name is None else name.strip()
+        if name is not None and not normalized_name:
+            raise InvalidProfileUpdateError("Name cannot be empty.")
+
+        normalized_language = None if preferred_language is None else preferred_language.strip().lower()
+        if normalized_language is not None and not normalized_language:
+            raise InvalidProfileUpdateError("Preferred language cannot be empty.")
+        if normalized_language is not None and normalized_language not in {
+            "english",
+            "hindi",
+            "bengali",
+            "marathi",
+            "tamil",
+            "telugu",
+            "kannada",
+            "gujarati",
+            "punjabi",
+            "odia",
+        }:
+            raise InvalidProfileUpdateError("Unsupported preferred language.")
+
+        return self._store.update_user_profile(
+            user_id=user_id,
+            name=normalized_name,
+            preferred_language=normalized_language,
+        )
+
+    def update_user_role(self, *, user_id: str, role: str) -> StoredUser:
+        normalized_role = role.strip().lower()
+        if normalized_role not in SUPPORTED_ROLES:
+            raise InvalidRoleError("Unsupported user role.")
+        return self._store.update_user_role(user_id=user_id, role=normalized_role)
+
+    def list_users(self) -> list[StoredUser]:
+        return self._store.list_users()
 
     def resolve_current_user(
         self,
