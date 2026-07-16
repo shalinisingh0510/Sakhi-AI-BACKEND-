@@ -2,7 +2,7 @@
 
 ## Current Task
 
-Progress tracking.
+Notifications.
 
 ## Completed Work
 
@@ -29,8 +29,10 @@ Progress tracking.
 - Added lesson schemas, a SQLite-backed lesson catalog, seeded educational content, and public/admin lesson APIs.
 - Added tests for the public lesson catalog, lesson CRUD, and lesson persistence across app instances.
 - Added multilingual lesson translations, language-aware lesson retrieval with fallback, and translation-aware tests.
+- Added lesson progress schemas, a SQLite-backed progress store, authenticated progress endpoints, and persistence tests.
 - Updated this implementation log after completing the lessons step.
 - Updated this implementation log after completing the multilingual content step.
+- Updated this implementation log after completing the progress tracking step.
 
 ## Files Created or Modified
 
@@ -48,6 +50,7 @@ Progress tracking.
 - `app/api/v1/endpoints/conversations.py`
 - `app/api/v1/endpoints/health.py`
 - `app/api/v1/endpoints/lessons.py`
+- `app/api/v1/endpoints/progress.py`
 - `app/core/__init__.py`
 - `app/core/config.py`
 - `app/core/logging.py`
@@ -56,20 +59,24 @@ Progress tracking.
 - `app/db/ai_store.py`
 - `app/db/auth_store.py`
 - `app/db/lesson_store.py`
+- `app/db/progress_store.py`
 - `app/main.py`
 - `app/schemas/__init__.py`
 - `app/schemas/ai.py`
 - `app/schemas/auth.py`
 - `app/schemas/lesson.py`
+- `app/schemas/progress.py`
 - `app/services/__init__.py`
 - `app/services/ai.py`
 - `app/services/auth.py`
 - `app/services/lessons.py`
+- `app/services/progress.py`
 - `tests/__init__.py`
 - `tests/test_auth.py`
 - `tests/test_conversations.py`
 - `tests/test_health.py`
 - `tests/test_lessons.py`
+- `tests/test_progress.py`
 - `pyproject.toml`
 
 ## Functionality Implemented
@@ -87,17 +94,18 @@ Progress tracking.
 - SQLite-backed AI conversation creation, message exchange, history retrieval, and private ownership checks.
 - Safe, rule-based educational AI responses with medical caution messaging.
 - SQLite-backed lesson catalog with seeded educational content, public browse endpoints, admin CRUD, and multilingual lesson translation support.
-- Automated test coverage for health, auth, persistence, profile, role-management, conversation, and lesson flows.
+- SQLite-backed lesson progress tracking with authenticated upsert, lookup, summaries, and persistence across app restarts.
+- Automated test coverage for health, auth, persistence, profile, role-management, conversation, lesson, and progress flows.
 
 ## Current Progress
 
 - Lessons and educational content APIs are now available through the API and persist in SQLite.
 - Multilingual lesson content is now available through localized lesson variants and language-aware retrieval.
-- The next step is to add progress tracking.
+- Lesson progress tracking is now available through authenticated APIs and persists in SQLite.
+- The next step is to add notifications.
 
 ## Remaining Work
 
-- Progress tracking.
 - Notifications.
 - Analytics and admin APIs.
 - Input validation hardening and security middleware.
