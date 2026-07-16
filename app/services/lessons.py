@@ -1,15 +1,14 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+import re
 from threading import RLock
 from typing import Protocol
 from uuid import uuid4
-import re
 
 from app.core.config import Settings
-from app.schemas.lesson import LessonDetail, LessonSection, LessonSummary
 from app.schemas.auth import SUPPORTED_LANGUAGES
+from app.schemas.lesson import LessonDetail, LessonSection, LessonSummary, LessonTranslationRequest
 
 SUPPORTED_LANGUAGE_SET = {language.lower() for language in SUPPORTED_LANGUAGES}
 DEFAULT_LESSON_LANGUAGE = "english"
@@ -45,41 +44,94 @@ class StoredLesson:
     audience: str
     tags: list[str]
     sections: list[dict[str, str]]
+    translations: dict[str, dict[str, object]]
     published: bool
-    created_at: datetime
-    updated_at: datetime
+    created_at: object
+    updated_at: object
     created_by_user_id: str | None = None
 
-    def to_summary(self) -> LessonSummary:
+    def available_languages(self) -> list[str]:
+        languages = {self.language, *self.translations.keys()}
+        return sorted(language for language in languages if language)
+
+    def _resolve_content(self, preferred_language: str | None = None) -> tuple[str, str, list[dict[str, str]], str]:
+        normalized_language = preferred_language.strip().lower() if preferred_language else self.language
+        if normalized_language == self.language:
+            return self.title, self.summary, self.sections, self.language
+
+        translation = self.translations.get(normalized_language)
+        if translation is None:
+            return self.title, self.summary, self.sections, self.language
+
+        return (
+            str(translation["title"]),
+            str(translation["summary"]),
+            [dict(section) for section in translation["sections"]],
+            normalized_language,
+        )
+
+    def to_summary(self, preferred_language: str | None = None) -> LessonSummary:
+        title, _, sections, resolved_language = self._resolve_content(preferred_language)
         return LessonSummary(
             id=self.id,
             slug=self.slug,
-            title=self.title,
+            title=title,
             category=self.category,
-            language=self.language,
+            language=resolved_language,
             audience=self.audience,
             published=self.published,
-            section_count=len(self.sections),
+            section_count=len(sections),
+            available_languages=self.available_languages(),
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
 
-    def to_detail(self) -> LessonDetail:
+    def to_detail(self, preferred_language: str | None = None) -> LessonDetail:
+        title, summary, sections, resolved_language = self._resolve_content(preferred_language)
         return LessonDetail(
             id=self.id,
             slug=self.slug,
-            title=self.title,
+            title=title,
             category=self.category,
-            language=self.language,
+            language=resolved_language,
             audience=self.audience,
             published=self.published,
-            section_count=len(self.sections),
+            section_count=len(sections),
+            available_languages=self.available_languages(),
             created_at=self.created_at,
             updated_at=self.updated_at,
-            summary=self.summary,
+            summary=summary,
             tags=self.tags,
-            sections=self.sections,
+            sections=sections,
         )
+
+    def search_text(self) -> str:
+        translation_bits: list[str] = []
+        for translation in self.translations.values():
+            translation_bits.extend(
+                [
+                    str(translation.get("title", "")),
+                    str(translation.get("summary", "")),
+                    " ".join(
+                        f"{section.get('heading', '')} {section.get('body', '')}"
+                        for section in translation.get("sections", [])
+                        if isinstance(section, dict)
+                    ),
+                ]
+            )
+
+        section_text = " ".join(section["heading"] + " " + section["body"] for section in self.sections)
+        return " ".join(
+            [
+                self.title,
+                self.category,
+                self.summary,
+                self.audience,
+                " ".join(self.tags),
+                section_text,
+                " ".join(translation_bits),
+            ]
+        ).lower()
 
 
 class LessonStoreProtocol(Protocol):
@@ -94,6 +146,7 @@ class LessonStoreProtocol(Protocol):
         audience: str,
         tags: list[str],
         sections: list[dict[str, str]],
+        translations: dict[str, dict[str, object]],
         published: bool,
         created_by_user_id: str | None = None,
     ) -> StoredLesson:
@@ -123,6 +176,7 @@ class LessonStoreProtocol(Protocol):
         audience: str | None = None,
         tags: list[str] | None = None,
         sections: list[dict[str, str]] | None = None,
+        translations: dict[str, dict[str, object]] | None = None,
         published: bool | None = None,
     ) -> StoredLesson:
         ...
@@ -146,21 +200,25 @@ class LessonService:
         language: str,
         audience: str,
         tags: list[str],
+        translations: list[LessonTranslationRequest],
         sections: list[LessonSection],
         published: bool,
         created_by_user_id: str | None = None,
     ) -> StoredLesson:
         normalized_slug = self._normalize_slug(slug or title)
+        normalized_language = self._normalize_language(language)
         self._validate_content_sections(sections)
+        normalized_translations = self._normalize_translations(translations, base_language=normalized_language)
         stored = self._store.create_lesson(
             title=title.strip(),
             slug=normalized_slug,
             category=category.strip().lower(),
             summary=summary.strip(),
-            language=language.strip().lower(),
+            language=normalized_language,
             audience=audience.strip().lower(),
             tags=self._normalize_tags(tags),
             sections=[section.model_dump() for section in sections],
+            translations=normalized_translations,
             published=published,
             created_by_user_id=created_by_user_id,
         )
@@ -172,11 +230,13 @@ class LessonService:
         category: str | None = None,
         language: str | None = None,
         search: str | None = None,
+        content_language: str | None = None,
         published_only: bool = True,
     ) -> list[LessonSummary]:
         lessons = self._store.list_lessons(published_only=published_only)
         normalized_category = category.strip().lower() if category else None
-        normalized_language = language.strip().lower() if language else None
+        normalized_language = self._normalize_language(language) if language else None
+        normalized_content_language = self._normalize_language(content_language) if content_language else None
         normalized_search = search.strip().lower() if search else None
 
         filtered: list[StoredLesson] = []
@@ -185,22 +245,24 @@ class LessonService:
                 continue
             if normalized_language and lesson.language != normalized_language:
                 continue
-            if normalized_search and normalized_search not in self._lesson_search_text(lesson):
+            if normalized_search and normalized_search not in lesson.search_text():
                 continue
             filtered.append(lesson)
-        return [lesson.to_summary() for lesson in filtered]
+        return [lesson.to_summary(normalized_content_language) for lesson in filtered]
 
-    def get_lesson(self, *, slug: str, published_only: bool = True) -> LessonDetail:
+    def get_lesson(self, *, slug: str, content_language: str | None = None, published_only: bool = True) -> LessonDetail:
         lesson = self._store.get_by_slug(slug.strip().lower())
         if lesson is None or (published_only and not lesson.published):
             raise LessonNotFoundError("Lesson not found.")
-        return lesson.to_detail()
+        normalized_content_language = self._normalize_language(content_language) if content_language else None
+        return lesson.to_detail(normalized_content_language)
 
-    def get_lesson_by_id(self, lesson_id: str) -> LessonDetail:
+    def get_lesson_by_id(self, lesson_id: str, *, content_language: str | None = None) -> LessonDetail:
         lesson = self._store.get_by_id(lesson_id)
         if lesson is None:
             raise LessonNotFoundError("Lesson not found.")
-        return lesson.to_detail()
+        normalized_content_language = self._normalize_language(content_language) if content_language else None
+        return lesson.to_detail(normalized_content_language)
 
     def list_categories(self, *, published_only: bool = True) -> list[dict[str, int | str]]:
         return [{"name": category, "lesson_count": count} for category, count in self._store.list_categories(published_only=published_only)]
@@ -216,21 +278,32 @@ class LessonService:
         language: str | None = None,
         audience: str | None = None,
         tags: list[str] | None = None,
+        translations: list[LessonTranslationRequest] | None = None,
         sections: list[LessonSection] | None = None,
         published: bool | None = None,
     ) -> StoredLesson:
         if sections is not None:
             self._validate_content_sections(sections)
+
+        normalized_language = self._normalize_language(language) if language is not None else None
+        existing_lesson = self._store.get_by_id(lesson_id) if translations is not None else None
+        base_language = normalized_language or (existing_lesson.language if existing_lesson is not None else None)
+        normalized_translations = (
+            self._normalize_translations(translations, base_language=base_language)
+            if translations is not None
+            else None
+        )
         return self._store.update_lesson(
             lesson_id=lesson_id,
             title=title.strip() if title is not None else None,
             slug=self._normalize_slug(slug) if slug is not None else None,
             category=category.strip().lower() if category is not None else None,
             summary=summary.strip() if summary is not None else None,
-            language=language.strip().lower() if language is not None else None,
+            language=normalized_language,
             audience=audience.strip().lower() if audience is not None else None,
             tags=self._normalize_tags(tags) if tags is not None else None,
             sections=[section.model_dump() for section in sections] if sections is not None else None,
+            translations=normalized_translations,
             published=published,
         )
 
@@ -243,6 +316,12 @@ class LessonService:
             raise InvalidLessonContentError("Lesson slug cannot be empty.")
         return slug
 
+    def _normalize_language(self, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in SUPPORTED_LANGUAGE_SET:
+            raise InvalidLessonContentError("Unsupported language.")
+        return normalized
+
     def _normalize_tags(self, tags: list[str]) -> list[str]:
         normalized = [tag.strip().lower() for tag in tags if tag.strip()]
         seen: set[str] = set()
@@ -253,10 +332,29 @@ class LessonService:
                 unique_tags.append(tag)
         return unique_tags
 
+    def _normalize_translations(
+        self,
+        translations: list[LessonTranslationRequest],
+        *,
+        base_language: str | None,
+    ) -> dict[str, dict[str, object]]:
+        normalized: dict[str, dict[str, object]] = {}
+        for translation in translations:
+            if base_language and translation.language == base_language:
+                raise InvalidLessonContentError("Translation language must be different from the base lesson language.")
+            if translation.language in normalized:
+                raise InvalidLessonContentError("Duplicate lesson translation language.")
+            normalized[translation.language] = {
+                "title": translation.title.strip(),
+                "summary": translation.summary.strip(),
+                "sections": [section.model_dump() for section in translation.sections],
+            }
+        return normalized
+
     def _validate_content_sections(self, sections: list[LessonSection]) -> None:
         if not sections:
             raise InvalidLessonContentError("At least one lesson section is required.")
 
     def _lesson_search_text(self, lesson: StoredLesson) -> str:
-        section_text = " ".join(section["heading"] + " " + section["body"] for section in lesson.sections)
-        return " ".join([lesson.title, lesson.category, lesson.summary, lesson.audience, " ".join(lesson.tags), section_text]).lower()
+        return lesson.search_text()
+

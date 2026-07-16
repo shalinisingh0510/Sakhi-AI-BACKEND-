@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import sqlite3
@@ -34,6 +34,7 @@ class SQLiteLessonStore:
                     audience TEXT NOT NULL,
                     tags_json TEXT NOT NULL,
                     sections_json TEXT NOT NULL,
+                    translations_json TEXT NOT NULL DEFAULT '{}',
                     published INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
@@ -44,6 +45,12 @@ class SQLiteLessonStore:
             self._connection.execute("CREATE INDEX IF NOT EXISTS idx_lessons_category ON lessons(category)")
             self._connection.execute("CREATE INDEX IF NOT EXISTS idx_lessons_language ON lessons(language)")
             self._connection.execute("CREATE INDEX IF NOT EXISTS idx_lessons_published ON lessons(published)")
+            self._ensure_column("translations_json", "TEXT NOT NULL DEFAULT '{}'")
+
+    def _ensure_column(self, column_name: str, column_definition: str) -> None:
+        columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(lessons)").fetchall()}
+        if column_name not in columns:
+            self._connection.execute(f"ALTER TABLE lessons ADD COLUMN {column_name} {column_definition}")
 
     def _seed_default_lessons(self) -> None:
         with self._lock:
@@ -121,6 +128,7 @@ class SQLiteLessonStore:
                 audience=lesson["audience"],
                 tags=lesson["tags"],
                 sections=lesson["sections"],
+                translations={},
                 published=True,
             )
 
@@ -132,6 +140,8 @@ class SQLiteLessonStore:
         if updated_at.tzinfo is None:
             updated_at = updated_at.replace(tzinfo=timezone.utc)
 
+        translations_raw = json.loads(row["translations_json"]) if row["translations_json"] else {}
+
         return StoredLesson(
             id=row["id"],
             slug=row["slug"],
@@ -142,6 +152,7 @@ class SQLiteLessonStore:
             audience=row["audience"],
             tags=json.loads(row["tags_json"]),
             sections=json.loads(row["sections_json"]),
+            translations={str(language).strip().lower(): dict(content) for language, content in translations_raw.items()},
             published=bool(row["published"]),
             created_at=created_at,
             updated_at=updated_at,
@@ -159,6 +170,7 @@ class SQLiteLessonStore:
         audience: str,
         tags: list[str],
         sections: list[dict[str, str]],
+        translations: dict[str, dict[str, object]],
         published: bool,
         created_by_user_id: str | None = None,
     ) -> StoredLesson:
@@ -170,9 +182,9 @@ class SQLiteLessonStore:
                     """
                     INSERT INTO lessons (
                         id, slug, title, category, summary, language, audience,
-                        tags_json, sections_json, published, created_at, updated_at, created_by_user_id
+                        tags_json, sections_json, translations_json, published, created_at, updated_at, created_by_user_id
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         lesson_id,
@@ -184,6 +196,7 @@ class SQLiteLessonStore:
                         audience,
                         json.dumps(tags),
                         json.dumps(sections),
+                        json.dumps(translations),
                         1 if published else 0,
                         timestamp,
                         timestamp,
@@ -248,6 +261,7 @@ class SQLiteLessonStore:
         audience: str | None = None,
         tags: list[str] | None = None,
         sections: list[dict[str, str]] | None = None,
+        translations: dict[str, dict[str, object]] | None = None,
         published: bool | None = None,
     ) -> StoredLesson:
         updates: list[str] = []
@@ -277,6 +291,9 @@ class SQLiteLessonStore:
         if sections is not None:
             updates.append("sections_json = ?")
             params.append(json.dumps(sections))
+        if translations is not None:
+            updates.append("translations_json = ?")
+            params.append(json.dumps(translations))
         if published is not None:
             updates.append("published = ?")
             params.append(1 if published else 0)

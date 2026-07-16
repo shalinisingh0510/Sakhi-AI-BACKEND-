@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -34,6 +34,65 @@ def test_public_lesson_catalog_exposes_seeded_content(tmp_path: Path) -> None:
     assert categories_response.status_code == 200
     categories = {entry["name"] for entry in categories_response.json()}
     assert "menstrual-health" in categories
+
+
+def test_lesson_can_return_localized_content_and_fallback(tmp_path: Path) -> None:
+    client = build_client(tmp_path / "localized-lessons.sqlite3")
+
+    admin_response = client.post("/api/v1/auth/register", json=REGISTER_ADMIN)
+    assert admin_response.status_code == 201
+    admin_token = admin_response.json()["access_token"]
+
+    create_response = client.post(
+        "/api/v1/admin/lessons",
+        json={
+            "title": "Mindful Breathing",
+            "slug": "mindful-breathing",
+            "category": "wellbeing",
+            "summary": "A short practice for calming the body and settling attention.",
+            "language": "english",
+            "audience": "general",
+            "tags": ["breathing", "calm"],
+            "published": True,
+            "sections": [
+                {"heading": "Start slowly", "body": "Breathe in gently through your nose and let the air out slowly."},
+            ],
+            "translations": [
+                {
+                    "language": "hindi",
+                    "title": "???? ?????",
+                    "summary": "???? ?? ???? ???? ?? ??? ???? ???? ???? ?? ???? ???????",
+                    "sections": [
+                        {
+                            "heading": "???? ???? ????",
+                            "body": "??? ?? ???? ???? ??? ?? ??? ????-???? ???? ????",
+                        }
+                    ],
+                }
+            ],
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create_response.status_code == 201
+
+    localized_detail_response = client.get("/api/v1/lessons/mindful-breathing?content_language=hindi")
+    assert localized_detail_response.status_code == 200
+    localized_detail = localized_detail_response.json()
+    assert localized_detail["language"] == "hindi"
+    assert localized_detail["title"] == "???? ?????"
+    assert localized_detail["sections"][0]["heading"] == "???? ???? ????"
+    assert set(localized_detail["available_languages"]) == {"english", "hindi"}
+
+    fallback_detail_response = client.get("/api/v1/lessons/mindful-breathing?content_language=marathi")
+    assert fallback_detail_response.status_code == 200
+    fallback_detail = fallback_detail_response.json()
+    assert fallback_detail["language"] == "english"
+    assert fallback_detail["title"] == "Mindful Breathing"
+
+    localized_catalog_response = client.get("/api/v1/lessons?content_language=hindi")
+    assert localized_catalog_response.status_code == 200
+    localized_catalog = localized_catalog_response.json()
+    assert any(lesson["slug"] == "mindful-breathing" and lesson["title"] == "???? ?????" for lesson in localized_catalog)
 
 
 def test_admin_can_create_update_and_delete_lesson(tmp_path: Path) -> None:

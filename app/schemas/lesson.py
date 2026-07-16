@@ -1,7 +1,6 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -23,6 +22,36 @@ class LessonSection(BaseModel):
         return normalized
 
 
+class LessonTranslationRequest(BaseModel):
+    language: str = Field(min_length=2, max_length=32)
+    title: str = Field(min_length=2, max_length=120)
+    summary: str = Field(min_length=10, max_length=400)
+    sections: list[LessonSection] = Field(default_factory=list)
+
+    @field_validator("language")
+    @classmethod
+    def normalize_language(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in SUPPORTED_LANGUAGE_SET:
+            raise ValueError("Unsupported language.")
+        return normalized
+
+    @field_validator("title", "summary")
+    @classmethod
+    def normalize_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("This field is required.")
+        return normalized
+
+    @field_validator("sections")
+    @classmethod
+    def validate_sections(cls, value: list[LessonSection]) -> list[LessonSection]:
+        if not value:
+            raise ValueError("At least one lesson section is required.")
+        return value
+
+
 class LessonSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -34,6 +63,7 @@ class LessonSummary(BaseModel):
     audience: str
     published: bool
     section_count: int
+    available_languages: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -52,6 +82,7 @@ class CreateLessonRequest(BaseModel):
     language: str = Field(default="english", max_length=32)
     audience: str = Field(default="general", max_length=80)
     tags: list[str] = Field(default_factory=list)
+    translations: list[LessonTranslationRequest] = Field(default_factory=list)
     published: bool = True
     sections: list[LessonSection] = Field(default_factory=list)
 
@@ -90,6 +121,16 @@ class CreateLessonRequest(BaseModel):
             return [str(tag).strip().lower() for tag in value if str(tag).strip()]
         return []
 
+    @field_validator("translations")
+    @classmethod
+    def validate_translations(cls, value: list[LessonTranslationRequest]) -> list[LessonTranslationRequest]:
+        seen: set[str] = set()
+        for translation in value:
+            if translation.language in seen:
+                raise ValueError("Duplicate lesson translation language.")
+            seen.add(translation.language)
+        return value
+
     @field_validator("sections")
     @classmethod
     def validate_sections(cls, value: list[LessonSection]) -> list[LessonSection]:
@@ -106,6 +147,7 @@ class UpdateLessonRequest(BaseModel):
     language: str | None = Field(default=None, max_length=32)
     audience: str | None = Field(default=None, max_length=80)
     tags: list[str] | None = None
+    translations: list[LessonTranslationRequest] | None = None
     published: bool | None = None
     sections: list[LessonSection] | None = None
 
@@ -148,6 +190,18 @@ class UpdateLessonRequest(BaseModel):
             normalized = [str(tag).strip().lower() for tag in value if str(tag).strip()]
             return normalized
         return None
+
+    @field_validator("translations")
+    @classmethod
+    def validate_translations(cls, value: list[LessonTranslationRequest] | None) -> list[LessonTranslationRequest] | None:
+        if value is None:
+            return None
+        seen: set[str] = set()
+        for translation in value:
+            if translation.language in seen:
+                raise ValueError("Duplicate lesson translation language.")
+            seen.add(translation.language)
+        return value
 
     @field_validator("sections")
     @classmethod

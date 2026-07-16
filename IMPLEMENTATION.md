@@ -1,8 +1,8 @@
-﻿# Sakhi AI Backend Implementation Log
+# Sakhi AI Backend Implementation Log
 
 ## Current Task
 
-Multilingual content support.
+Progress tracking.
 
 ## Completed Work
 
@@ -28,7 +28,9 @@ Multilingual content support.
 - Added tests for conversation creation, message exchange, persistence, and private conversation access.
 - Added lesson schemas, a SQLite-backed lesson catalog, seeded educational content, and public/admin lesson APIs.
 - Added tests for the public lesson catalog, lesson CRUD, and lesson persistence across app instances.
+- Added multilingual lesson translations, language-aware lesson retrieval with fallback, and translation-aware tests.
 - Updated this implementation log after completing the lessons step.
+- Updated this implementation log after completing the multilingual content step.
 
 ## Files Created or Modified
 
@@ -84,17 +86,17 @@ Multilingual content support.
 - Role-based authorization helpers and admin-only user listing and role update endpoints.
 - SQLite-backed AI conversation creation, message exchange, history retrieval, and private ownership checks.
 - Safe, rule-based educational AI responses with medical caution messaging.
-- SQLite-backed lesson catalog with seeded educational content, public browse endpoints, and admin CRUD.
+- SQLite-backed lesson catalog with seeded educational content, public browse endpoints, admin CRUD, and multilingual lesson translation support.
 - Automated test coverage for health, auth, persistence, profile, role-management, conversation, and lesson flows.
 
 ## Current Progress
 
 - Lessons and educational content APIs are now available through the API and persist in SQLite.
-- The next step is to expand into multilingual content support.
+- Multilingual lesson content is now available through localized lesson variants and language-aware retrieval.
+- The next step is to add progress tracking.
 
 ## Remaining Work
 
-- Multilingual content support.
 - Progress tracking.
 - Notifications.
 - Analytics and admin APIs.

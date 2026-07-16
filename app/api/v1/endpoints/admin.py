@@ -1,6 +1,6 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.dependencies import get_auth_service, get_lesson_service, require_roles
 from app.schemas.auth import PublicUser, UpdateRoleRequest
@@ -47,20 +47,27 @@ def update_user_role(
 
 @router.get("/lessons", response_model=list[LessonSummary])
 def list_lessons(
+    content_language: str | None = Query(default=None),
     _current_user: StoredUser = Depends(require_roles("admin")),
     lesson_service: LessonService = Depends(get_lesson_service),
 ) -> list[LessonSummary]:
-    return lesson_service.list_lessons(published_only=False)
+    try:
+        return lesson_service.list_lessons(published_only=False, content_language=content_language)
+    except InvalidLessonContentError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/lessons/{lesson_id}", response_model=LessonDetail)
 def get_lesson(
     lesson_id: str,
+    content_language: str | None = Query(default=None),
     _current_user: StoredUser = Depends(require_roles("admin")),
     lesson_service: LessonService = Depends(get_lesson_service),
 ) -> LessonDetail:
     try:
-        return lesson_service.get_lesson_by_id(lesson_id)
+        return lesson_service.get_lesson_by_id(lesson_id, content_language=content_language)
+    except InvalidLessonContentError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except LessonNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
@@ -80,6 +87,7 @@ def create_lesson(
             language=payload.language,
             audience=payload.audience,
             tags=payload.tags,
+            translations=payload.translations,
             sections=payload.sections,
             published=payload.published,
             created_by_user_id=_current_user.id,
@@ -109,6 +117,7 @@ def update_lesson(
             language=payload.language,
             audience=payload.audience,
             tags=payload.tags,
+            translations=payload.translations,
             sections=payload.sections,
             published=payload.published,
         )

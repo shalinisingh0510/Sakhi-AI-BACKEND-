@@ -1,4 +1,4 @@
-﻿from .ai import ConversationDetail, ConversationMessage, ConversationSummary, CreateConversationRequest, SendMessageRequest
+from .ai import ConversationDetail, ConversationMessage, ConversationSummary, CreateConversationRequest, SendMessageRequest
 from .auth import (
     AuthResponse,
     LoginRequest,
@@ -8,7 +8,7 @@ from .auth import (
     UpdateProfileRequest,
     UpdateRoleRequest,
 )
-from .lesson import CreateLessonRequest, LessonDetail, LessonSection, LessonSummary, UpdateLessonRequest
+from .lesson import CreateLessonRequest, LessonDetail, LessonSection, LessonSummary, LessonTranslationRequest, UpdateLessonRequest
 
 __all__ = [
     "AuthResponse",
@@ -20,6 +20,7 @@ __all__ = [
     "LessonDetail",
     "LessonSection",
     "LessonSummary",
+    "LessonTranslationRequest",
     "LoginRequest",
     "PublicUser",
     "RefreshRequest",
