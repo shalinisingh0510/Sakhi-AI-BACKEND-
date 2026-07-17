@@ -1,4 +1,14 @@
 from .ai import ConversationDetail, ConversationMessage, ConversationSummary, CreateConversationRequest, SendMessageRequest
+from .analytics import (
+    AnalyticsEvent,
+    AnalyticsReport,
+    CreateEventRequest,
+    DailyActivity,
+    EventBreakdown,
+    EventType,
+    PlatformOverview,
+    UserEngagementMetrics,
+)
 from .auth import (
     AuthResponse,
     LoginRequest,
@@ -19,13 +29,19 @@ from .notification import (
 from .progress import LessonProgressItem, ProgressOverview, UpdateProgressRequest
 
 __all__ = [
+    "AnalyticsEvent",
+    "AnalyticsReport",
     "AuthResponse",
     "ConversationDetail",
     "ConversationMessage",
     "ConversationSummary",
     "CreateConversationRequest",
+    "CreateEventRequest",
     "CreateLessonRequest",
     "CreateNotificationRequest",
+    "DailyActivity",
+    "EventBreakdown",
+    "EventType",
     "LessonDetail",
     "LessonProgressItem",
     "LessonSection",
@@ -35,6 +51,7 @@ __all__ = [
     "NotificationDispatchResult",
     "NotificationItem",
     "NotificationType",
+    "PlatformOverview",
     "ProgressOverview",
     "PublicUser",
     "RefreshRequest",
@@ -45,4 +62,5 @@ __all__ = [
     "UpdateProgressRequest",
     "UpdateProfileRequest",
     "UpdateRoleRequest",
+    "UserEngagementMetrics",
 ]

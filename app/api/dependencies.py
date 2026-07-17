@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import Depends, Header, HTTPException, Request, status
 
 from app.services.ai import AIService
+from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService, InvalidTokenError, StoredUser
 from app.services.lessons import LessonService
 from app.services.notifications import NotificationService
@@ -27,6 +28,10 @@ def get_notification_service(request: Request) -> NotificationService:
 
 def get_progress_service(request: Request) -> ProgressService:
     return request.app.state.progress_service
+
+
+def get_analytics_service(request: Request) -> AnalyticsService:
+    return request.app.state.analytics_service
 
 
 def get_current_user(

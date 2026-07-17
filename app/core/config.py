@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     secret_key: SecretStr = Field(default=SecretStr("dev-secret-change-me"))
     access_token_minutes: int = 60
     refresh_token_days: int = 7
+    rate_limit_requests_per_minute: int = 60
 
     model_config = SettingsConfigDict(
         env_prefix="SAKHI_",

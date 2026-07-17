@@ -6,8 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
-from app.db import SQLiteAuthStore, SQLiteConversationStore, SQLiteLessonStore, SQLiteNotificationStore, SQLiteProgressStore
+from app.core.middleware import configure_rate_limiter, rate_limit_middleware, request_size_middleware, security_headers_middleware
+from app.db import SQLiteAuthStore, SQLiteAnalyticsStore, SQLiteConversationStore, SQLiteLessonStore, SQLiteNotificationStore, SQLiteProgressStore
 from app.services.ai import AIService
+from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService, AuthStoreProtocol
 from app.services.lessons import LessonService
 from app.services.notifications import NotificationService
@@ -44,6 +46,11 @@ def create_app(
         lesson_service=app.state.lesson_service,
         notification_service=app.state.notification_service,
     )
+    app.state.analytics_store = SQLiteAnalyticsStore(settings.database_path)
+    app.state.analytics_service = AnalyticsService(settings, store=app.state.analytics_store)
+
+    # Configure rate limiter from settings
+    configure_rate_limiter(settings.rate_limit_requests_per_minute)
 
     app.add_middleware(
         CORSMiddleware,
@@ -52,6 +59,11 @@ def create_app(
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Add security middleware
+    app.middleware("http")(security_headers_middleware)
+    app.middleware("http")(request_size_middleware)
+    app.middleware("http")(rate_limit_middleware)
 
     app.include_router(api_router)
 
