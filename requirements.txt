@@ -1,0 +1,12 @@
+# Core runtime dependencies
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic-settings>=2.6,<3.0
+python-dotenv>=1.0,<2.0
+
+# Production server
+gunicorn>=21.0,<23.0
+
+# Optional: enable the OpenAI AI provider
+# Uncomment the line below or install with: pip install "sakhi-ai-backend[ai]"
+# openai>=1.30,<2.0

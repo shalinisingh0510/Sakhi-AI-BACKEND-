@@ -14,12 +14,18 @@ class Settings(BaseSettings):
     debug: bool = False
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     database_path: Path = Field(default=Path("sakhi_ai.sqlite3"))
+    # AI provider: "rule-based" (default, no API key needed) or "openai"
     ai_provider_name: str = "rule-based"
+    openai_api_key: SecretStr | None = Field(default=None)
+    openai_model: str = "gpt-4o-mini"
     conversation_history_limit: int = 8
     secret_key: SecretStr = Field(default=SecretStr("dev-secret-change-me"))
     access_token_minutes: int = 60
     refresh_token_days: int = 7
     rate_limit_requests_per_minute: int = 60
+    # Pagination defaults
+    default_page_size: int = 20
+    max_page_size: int = 100
 
     model_config = SettingsConfigDict(
         env_prefix="SAKHI_",
@@ -52,7 +58,14 @@ class Settings(BaseSettings):
             return Path("sakhi_ai.sqlite3")
         return Path(normalized)
 
-    @field_validator("access_token_minutes", "refresh_token_days", "conversation_history_limit", mode="before")
+    @field_validator(
+        "access_token_minutes",
+        "refresh_token_days",
+        "conversation_history_limit",
+        "default_page_size",
+        "max_page_size",
+        mode="before",
+    )
     @classmethod
     def parse_positive_int(cls, value: object) -> int:
         parsed_value = int(value)

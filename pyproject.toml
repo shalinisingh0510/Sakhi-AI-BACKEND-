@@ -24,6 +24,9 @@ dev = [
 production = [
   "gunicorn>=21.0,<23.0",
 ]
+ai = [
+  "openai>=1.30,<2.0",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

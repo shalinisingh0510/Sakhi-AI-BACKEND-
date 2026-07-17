@@ -9,6 +9,7 @@ from uuid import uuid4
 from app.core.config import Settings
 from app.schemas.ai import ConversationDetail, ConversationMessage, ConversationSummary
 from app.schemas.auth import SUPPORTED_LANGUAGES
+from app.services.ai_providers import AIProviderProtocol, build_ai_provider
 
 SUPPORTED_LANGUAGE_SET = {language.lower() for language in SUPPORTED_LANGUAGES}
 DEFAULT_CONVERSATION_LANGUAGE = "english"
@@ -84,9 +85,15 @@ class ConversationStoreProtocol(Protocol):
 
 
 class AIService:
-    def __init__(self, settings: Settings, store: ConversationStoreProtocol) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        store: ConversationStoreProtocol,
+        provider: AIProviderProtocol | None = None,
+    ) -> None:
         self._settings = settings
         self._store = store
+        self._provider: AIProviderProtocol = provider or build_ai_provider(settings)
 
     def create_conversation(
         self,
@@ -107,10 +114,11 @@ class AIService:
         self._store.add_message(
             conversation_id=conversation.id,
             role="assistant",
-            content=self._generate_reply(
+            content=self._provider.generate_reply(
                 user_message=initial_message,
-                title=conversation.title,
+                conversation_title=conversation.title,
                 preferred_language=conversation.preferred_language,
+                history=[],
             ),
         )
         return self.get_conversation(user_id=user_id, conversation_id=conversation.id)
@@ -132,10 +140,13 @@ class AIService:
     ) -> ConversationDetail:
         conversation = self._require_owned_conversation(user_id=user_id, conversation_id=conversation_id)
         self._store.add_message(conversation_id=conversation.id, role="user", content=message)
-        reply_text = self._generate_reply(
+        # Build recent history for context-aware replies (respects history limit)
+        history = self._build_history(conversation_id=conversation.id, exclude_last_n=0)
+        reply_text = self._provider.generate_reply(
             user_message=message,
-            title=conversation.title,
+            conversation_title=conversation.title,
             preferred_language=conversation.preferred_language,
+            history=history,
         )
         self._store.add_message(conversation_id=conversation.id, role="assistant", content=reply_text)
         return self.get_conversation(user_id=user_id, conversation_id=conversation.id)
@@ -160,41 +171,21 @@ class AIService:
             return DEFAULT_CONVERSATION_LANGUAGE
         return normalized
 
-    def _generate_reply(
+    def _build_history(
         self,
         *,
-        user_message: str,
-        title: str,
-        preferred_language: str,
-    ) -> str:
-        message = user_message.lower()
-        history_note = f"We are continuing the conversation titled '{title}'."
-
-        if any(keyword in message for keyword in ("period", "menstrual", "cramp", "cycle")):
-            body = (
-                "Educational guidance: menstrual cramps and cycle changes are common, but severe pain, heavy bleeding, "
-                "or dizziness should be reviewed by a qualified clinician. Gentle rest, hydration, and a heat pack may help."
-            )
-        elif any(keyword in message for keyword in ("pregnan", "baby", "fertility", "ovulation")):
-            body = (
-                "Educational guidance: questions about fertility and pregnancy deserve careful, personalized medical advice. "
-                "If you might be pregnant or have pain, bleeding, or unusual symptoms, please contact a healthcare professional."
-            )
-        elif any(keyword in message for keyword in ("stress", "anxious", "anxiety", "sad", "mental health")):
-            body = (
-                "Educational guidance: stress and emotional health matter too. If you feel overwhelmed, try slow breathing, "
-                "rest, and reaching out to someone you trust. If symptoms are persistent or severe, ask a professional for support."
-            )
-        elif any(keyword in message for keyword in ("hygiene", "itch", "discharge", "infection")):
-            body = (
-                "Educational guidance: changes in discharge, itching, or irritation can have different causes. Keep the area clean and dry, "
-                "avoid harsh products, and seek medical advice if symptoms are painful, persistent, or unusual for you."
-            )
-        else:
-            body = (
-                "Educational guidance: I can share trusted health information, explain symptoms in simple terms, and suggest safe next steps. "
-                "If you want, tell me more about the main concern and I can keep the guidance focused and practical."
-            )
-
-        language_hint = "" if preferred_language == DEFAULT_CONVERSATION_LANGUAGE else f" ({preferred_language})"
-        return f"{history_note}{language_hint} {body} This response is educational and not a diagnosis."
+        conversation_id: str,
+        exclude_last_n: int = 0,
+    ) -> list[dict[str, str]]:
+        """
+        Return the recent message history as a list of OpenAI-compatible
+        {role, content} dicts, capped to `conversation_history_limit` messages.
+        `exclude_last_n` allows omitting the last N messages (e.g. the user
+        message that was just appended before this call).
+        """
+        messages = self._store.get_messages(conversation_id)
+        if exclude_last_n:
+            messages = messages[:-exclude_last_n]
+        limit = self._settings.conversation_history_limit
+        recent = messages[-limit:] if len(messages) > limit else messages
+        return [{"role": msg.role, "content": msg.content} for msg in recent]

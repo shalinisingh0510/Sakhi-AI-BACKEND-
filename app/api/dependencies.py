@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import Depends, Header, HTTPException, Request, status
+from fastapi import Depends, Header, HTTPException, Query, Request, status
 
 from app.services.ai import AIService
 from app.services.analytics import AnalyticsService
@@ -69,3 +69,12 @@ def require_roles(*roles: str):
         return current_user
 
     return dependency
+
+
+def pagination_params(
+    page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+) -> tuple[int, int]:
+    """Return (offset, limit) for use in list queries."""
+    offset = (page - 1) * page_size
+    return offset, page_size

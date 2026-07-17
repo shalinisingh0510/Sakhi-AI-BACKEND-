@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.dependencies import get_auth_service, get_lesson_service, get_notification_service, require_roles
+from app.api.dependencies import (
+    get_analytics_service,
+    get_auth_service,
+    get_lesson_service,
+    get_notification_service,
+    require_roles,
+)
 from app.schemas.auth import PublicUser, UpdateRoleRequest
 from app.schemas.lesson import CreateLessonRequest, LessonDetail, LessonSummary, UpdateLessonRequest
 from app.schemas.notification import CreateNotificationRequest, NotificationDispatchResult
+from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService, InvalidRoleError, StoredUser, UserNotFoundError
 from app.services.lessons import DuplicateLessonSlugError, InvalidLessonContentError, LessonNotFoundError, LessonService
 from app.services.notifications import NotificationService
@@ -19,6 +26,42 @@ def admin_overview(current_user: StoredUser = Depends(require_roles("admin"))) -
         "status": "ok",
         "message": "Admin access granted",
         "user": current_user.email,
+    }
+
+
+@router.get("/stats")
+def admin_stats(
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    auth_service: AuthService = Depends(get_auth_service),
+    analytics_service: AnalyticsService = Depends(get_analytics_service),
+    lesson_service: LessonService = Depends(get_lesson_service),
+) -> dict:
+    """Combined admin dashboard stats — single request covers users, content, and activity."""
+    platform = analytics_service.get_platform_overview()
+    lessons = lesson_service.list_lessons(published_only=False)
+    published_count = sum(1 for l in lessons if l.published)
+    unpublished_count = len(lessons) - published_count
+    categories = lesson_service.list_categories(published_only=False)
+
+    return {
+        "users": {
+            "total": platform.total_users,
+            "active_last_7_days": platform.active_users_last_7_days,
+            "active_last_30_days": platform.active_users_last_30_days,
+        },
+        "lessons": {
+            "total": len(lessons),
+            "published": published_count,
+            "unpublished": unpublished_count,
+            "categories": len(categories),
+        },
+        "engagement": {
+            "total_events": platform.total_events,
+            "total_lesson_views": platform.total_lesson_views,
+            "total_lesson_completions": platform.total_lesson_completions,
+            "total_conversations": platform.total_conversations,
+            "total_messages": platform.total_messages,
+        },
     }
 
 

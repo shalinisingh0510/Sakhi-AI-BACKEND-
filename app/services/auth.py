@@ -91,6 +91,9 @@ class AuthStoreProtocol(Protocol):
     def update_user_role(self, *, user_id: str, role: str) -> StoredUser:
         ...
 
+    def change_password(self, *, user_id: str, current_password: str, new_password: str) -> None:
+        ...
+
     def list_users(self) -> list[StoredUser]:
         ...
 
@@ -189,6 +192,15 @@ class InMemoryAuthStore:
             user.role = normalized_role
             return user
 
+    def change_password(self, *, user_id: str, current_password: str, new_password: str) -> None:
+        with self._lock:
+            user = self._users_by_id.get(user_id)
+            if user is None:
+                raise UserNotFoundError("User not found.")
+            if not verify_password(current_password, user.password_hash):
+                raise InvalidCredentialsError("Current password is incorrect.")
+            user.password_hash = hash_password(new_password)
+
     def list_users(self) -> list[StoredUser]:
         with self._lock:
             return sorted(self._users_by_id.values(), key=lambda user: user.created_at)
@@ -251,6 +263,16 @@ class AuthService:
         if normalized_role not in SUPPORTED_ROLES:
             raise InvalidRoleError("Unsupported user role.")
         return self._store.update_user_role(user_id=user_id, role=normalized_role)
+
+    def change_password(self, *, user_id: str, current_password: str, new_password: str) -> None:
+        """Verify the current password then replace it with the new one."""
+        if current_password == new_password:
+            raise InvalidProfileUpdateError("New password must be different from the current password.")
+        self._store.change_password(
+            user_id=user_id,
+            current_password=current_password,
+            new_password=new_password,
+        )
 
     def list_users(self) -> list[StoredUser]:
         return self._store.list_users()

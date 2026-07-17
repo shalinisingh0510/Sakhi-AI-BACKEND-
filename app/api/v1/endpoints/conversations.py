@@ -1,8 +1,8 @@
 ﻿from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.api.dependencies import get_ai_service, get_current_user
+from app.api.dependencies import get_ai_service, get_current_user, pagination_params
 from app.schemas.ai import ConversationDetail, ConversationSummary, CreateConversationRequest, SendMessageRequest
 from app.services.ai import AIService, ConversationNotFoundError
 from app.services.auth import StoredUser
@@ -12,10 +12,13 @@ router = APIRouter(prefix="/conversations", tags=["conversations"])
 
 @router.get("", response_model=list[ConversationSummary])
 def list_conversations(
+    pagination: tuple[int, int] = Depends(pagination_params),
     current_user: StoredUser = Depends(get_current_user),
     ai_service: AIService = Depends(get_ai_service),
 ) -> list[ConversationSummary]:
-    return ai_service.list_conversations(user_id=current_user.id)
+    offset, limit = pagination
+    all_conversations = ai_service.list_conversations(user_id=current_user.id)
+    return all_conversations[offset : offset + limit]
 
 
 @router.post("", response_model=ConversationDetail, status_code=status.HTTP_201_CREATED)

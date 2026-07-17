@@ -180,6 +180,21 @@ class SQLiteAuthStore:
             raise UserNotFoundError("User not found.")
         return user
 
+    def change_password(self, *, user_id: str, current_password: str, new_password: str) -> None:
+        user = self.get_by_id(user_id)
+        if user is None:
+            raise UserNotFoundError("User not found.")
+        if not verify_password(current_password, user.password_hash):
+            raise InvalidCredentialsError("Current password is incorrect.")
+        new_hash = hash_password(new_password)
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "UPDATE users SET password_hash = ? WHERE id = ?",
+                (new_hash, user_id),
+            )
+        if cursor.rowcount == 0:
+            raise UserNotFoundError("User not found.")
+
     def list_users(self) -> list[StoredUser]:
         with self._lock:
             rows = self._connection.execute(

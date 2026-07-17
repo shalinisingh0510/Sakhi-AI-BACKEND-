@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import RLock
@@ -9,6 +11,8 @@ import json
 
 from app.core.config import Settings
 from app.schemas.notification import NotificationItem, NotificationType
+
+logger = logging.getLogger(__name__)
 
 
 class NotificationError(Exception):
@@ -82,7 +86,26 @@ class NotificationService:
             notification_type=notification_type,
             metadata=metadata or {},
         )
-        return record.to_item()
+        item = record.to_item()
+        # Push real-time update over WebSocket if the user is connected
+        self._push_realtime(user_id, item)
+        return item
+
+    def _push_realtime(self, user_id: str, item: NotificationItem) -> None:
+        """Fire-and-forget WebSocket push. Never raises."""
+        try:
+            from app.core.websocket_manager import ws_manager  # avoid circular import at module load
+
+            payload = {"type": "notification", "data": item.model_dump(mode="json")}
+            # Run in the current event loop if one is running, otherwise skip.
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(ws_manager.send_notification(user_id, payload))
+            except RuntimeError:
+                pass  # No event loop — sync context (e.g. tests); skip push
+        except Exception as exc:
+            logger.warning("Real-time notification push failed: %s", exc)
 
     def create_notifications_for_users(
         self,

@@ -119,6 +119,19 @@ class UpdateRoleRequest(BaseModel):
     role: Literal["user", "admin", "moderator"]
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("current_password", "new_password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        return normalized
+
+
 class AuthResponse(BaseModel):
     user: PublicUser
     access_token: str
