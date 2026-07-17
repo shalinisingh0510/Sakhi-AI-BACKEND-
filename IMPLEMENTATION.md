@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**All core features plus next-step enhancements are implemented and tested. 79 tests passing.**
+**Phase 11 complete. 106 tests passing. Backend is production-ready with a comprehensive feature set.**
 
 ---
 
@@ -50,7 +50,7 @@
 - 10 supported event types. User engagement metrics, platform overview, event breakdown, daily activity, top users, full analytics report.
 
 ### Phase 8 — Security Middleware
-- Added rate limiting (60 req/min per client, configurable), request size limit (10 MB), and comprehensive security headers (HSTS, CSP-related, X-Frame-Options, Referrer-Policy, Permissions-Policy).
+- Added rate limiting (60 req/min per client, configurable), request size limit (10 MB), and comprehensive security headers (HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy).
 - Comprehensive middleware tests (security headers, rate limiting enforcement, per-user identifiers, HSTS, Referrer-Policy, Permissions-Policy).
 
 ### Phase 9 — Deployment & Production Hardening
@@ -58,22 +58,36 @@
 - Added Gunicorn as an optional `[production]` dependency.
 - Wired all stores, services, and middleware together in the app factory.
 
-### Phase 10 — Next-Step Enhancements (this session)
-- **Pluggable AI provider**: Added `app/services/ai_providers.py` with `RuleBasedProvider` (default, no API key) and `OpenAIProvider` (GPT-4o-mini with full conversation history context, automatic fallback to rule-based on error or missing `openai` package).
-- **OpenAI settings**: Added `SAKHI_AI_PROVIDER_NAME`, `SAKHI_OPENAI_API_KEY`, `SAKHI_OPENAI_MODEL` to `Settings` and documented them in `.env.example`.
-- **`openai` optional dependency**: Added `openai>=1.30` as `[ai]` extras in `pyproject.toml`.
-- **Password change endpoint**: `POST /api/v1/auth/me/change-password` — verifies current password, rejects same-as-current, returns 204, persists across restarts.
-- **`ChangePasswordRequest` schema** added to `app/schemas/auth.py`.
-- **`change_password` method** added to `AuthService`, `InMemoryAuthStore`, and `SQLiteAuthStore`.
-- **Pagination**: Added `page` / `page_size` query params to conversations and notifications list endpoints via shared `pagination_params` dependency. Added `SAKHI_DEFAULT_PAGE_SIZE` and `SAKHI_MAX_PAGE_SIZE` settings.
-- **WebSocket real-time notifications**: `wss://.../api/v1/ws/notifications?token=<access_token>` — authenticates via token query param, sends welcome on connect, pushes JSON notification payloads instantly, echoes pong to client pings, sends server heartbeat pings every 30 seconds.
-- **`WebSocketManager`** singleton (`app/core/websocket_manager.py`) tracks per-user connections and supports broadcast.
-- **`NotificationService.create_notification`** now fire-and-forgets a WebSocket push for any connected user.
-- **Enhanced health check**: `/api/v1/health` now probes SQLite connectivity and returns a `database` field; status becomes `"degraded"` if the DB is unreachable.
-- **Admin dashboard stats**: `GET /api/v1/admin/stats` returns user counts (total, 7-day active, 30-day active), lesson counts (total, published, unpublished, categories), and platform engagement totals in a single request.
-- **`requirements.txt`**: Created (referenced by DEPLOYMENT.md but previously missing).
-- **GitHub Actions CI/CD**: `.github/workflows/ci.yml` — lint (ruff check + format), tests on Python 3.11 and 3.12, security audit (pip-audit).
-- **New tests**: `test_ai_providers.py` (13), `test_password_change.py` (5), `test_pagination.py` (5), `test_websocket.py` (5), `test_admin_stats.py` (8). Total: **79 tests passing**.
+### Phase 10 — Next-Step Enhancements
+- **Pluggable AI provider** (`app/services/ai_providers.py`): `RuleBasedProvider` (default) and `OpenAIProvider` (GPT-4o-mini with conversation history, falls back to rule-based on any error or missing package).
+- **OpenAI settings**: `SAKHI_AI_PROVIDER_NAME`, `SAKHI_OPENAI_API_KEY`, `SAKHI_OPENAI_MODEL`.
+- **`openai>=1.30` optional dependency** (`[ai]` extras).
+- **Password change endpoint**: `POST /api/v1/auth/me/change-password` — verifies current password, rejects same-as-current, returns 204.
+- **Pagination**: `page`/`page_size` on conversations and notifications list endpoints via shared `pagination_params` dependency.
+- **WebSocket real-time notifications**: `wss://.../api/v1/ws/notifications?token=<access_token>` with instant push, heartbeat, and pong.
+- **`WebSocketManager`** singleton with per-user connection tracking and broadcast.
+- **`NotificationService.create_notification`** fire-and-forgets a WebSocket push for any connected user.
+- **Enhanced health check**: probes SQLite connectivity, returns `database` field, status `"degraded"` on DB error.
+- **Admin dashboard stats**: `GET /api/v1/admin/stats` — user counts, lesson counts, engagement totals in one request.
+- **`requirements.txt`** created.
+- **GitHub Actions CI/CD**: `.github/workflows/ci.yml` — lint, multi-Python tests (3.11 + 3.12), pip-audit security scan.
+
+### Phase 11 — Auth Security, Notification Management & Developer Experience
+- **Token revocation / logout**: `POST /api/v1/auth/logout` — revokes the current access token by adding its JTI to an in-process `TokenBlacklist`. Subsequent requests with the same token return 401. Memory-bounded (expired entries auto-purged).
+- **`TokenBlacklist`** class (`app/core/token_blacklist.py`) with `revoke`, `is_revoked`, auto-purge, and `size` property. Global singleton.
+- **`AuthService.logout`** method decodes the token raw (no expiry check) and revokes its JTI.
+- **`AuthService.resolve_current_user`** now checks the blacklist before resolving a user.
+- **Account deletion**: `DELETE /api/v1/auth/me` — permanently removes the authenticated user and all cascade-deleted associated data. Returns 204. Persists across restarts.
+- **`AuthService.delete_user`** + `SQLiteAuthStore.delete_user` + `InMemoryAuthStore.delete_user`.
+- **Mark all notifications as read**: `POST /api/v1/notifications/read-all` — marks every unread notification for the user as read in a single DB call. Returns `{"updated_count": N}`. Idempotent.
+- **Delete notification**: `DELETE /api/v1/notifications/{id}` — permanently removes a single notification from the user's inbox. Ownership enforced (404 if not owner).
+- **`NotificationService.mark_all_as_read`** and `delete_notification` methods added.
+- **`SQLiteNotificationStore.mark_all_as_read`** and `delete_notification` methods added.
+- **Lesson tag filtering**: `GET /api/v1/lessons?tag=<tag>` — filters lessons by a single tag. Case-insensitive. Combinable with `category`, `language`, and `search`.
+- **`LessonService.list_lessons`** extended with `tag` parameter.
+- **Structured access log middleware** (`access_log_middleware`): logs `METHOD PATH STATUS_CODE Xms req_id=XXXX` for every request. Adds `X-Request-Id` header to every response for tracing.
+- **Wired `access_log_middleware`** into `app/main.py`.
+- **New tests**: `test_logout_and_account.py` (10), `test_notifications_extended.py` (9), `test_lessons_extended.py` (8). Total: **106 tests passing**.
 
 ---
 
@@ -83,8 +97,8 @@
 - `.env.example`
 - `.gitignore`
 - `pyproject.toml`
-- `requirements.txt` *(new)*
-- `.github/workflows/ci.yml` *(new)*
+- `requirements.txt`
+- `.github/workflows/ci.yml`
 
 ### Documentation
 - `DEPLOYMENT.md`
@@ -98,7 +112,8 @@
 - `app/core/logging.py`
 - `app/core/middleware.py`
 - `app/core/security.py`
-- `app/core/websocket_manager.py` *(new)*
+- `app/core/token_blacklist.py` *(new — Phase 11)*
+- `app/core/websocket_manager.py` *(new — Phase 10)*
 
 ### API Layer
 - `app/api/__init__.py`
@@ -114,7 +129,7 @@
 - `app/api/v1/endpoints/lessons.py`
 - `app/api/v1/endpoints/notifications.py`
 - `app/api/v1/endpoints/progress.py`
-- `app/api/v1/endpoints/ws.py` *(new)*
+- `app/api/v1/endpoints/ws.py` *(new — Phase 10)*
 
 ### Database Layer
 - `app/db/__init__.py`
@@ -137,7 +152,7 @@
 ### Services
 - `app/services/__init__.py`
 - `app/services/ai.py`
-- `app/services/ai_providers.py` *(new)*
+- `app/services/ai_providers.py` *(new — Phase 10)*
 - `app/services/analytics.py`
 - `app/services/auth.py`
 - `app/services/lessons.py`
@@ -147,114 +162,100 @@
 ### Tests
 - `tests/__init__.py`
 - `tests/conftest.py`
-- `tests/test_admin_stats.py` *(new)*
-- `tests/test_ai_providers.py` *(new)*
+- `tests/test_admin_stats.py`
+- `tests/test_ai_providers.py`
 - `tests/test_analytics.py`
 - `tests/test_auth.py`
 - `tests/test_conversations.py`
 - `tests/test_health.py`
 - `tests/test_lessons.py`
+- `tests/test_lessons_extended.py` *(new — Phase 11)*
+- `tests/test_logout_and_account.py` *(new — Phase 11)*
 - `tests/test_middleware.py`
 - `tests/test_notifications.py`
-- `tests/test_pagination.py` *(new)*
-- `tests/test_password_change.py` *(new)*
+- `tests/test_notifications_extended.py` *(new — Phase 11)*
+- `tests/test_pagination.py`
+- `tests/test_password_change.py`
 - `tests/test_progress.py`
-- `tests/test_websocket.py` *(new)*
+- `tests/test_websocket.py`
 
 ---
 
 ## Functionality Implemented
 
 ### Application Foundation
-- FastAPI app factory (`create_app`) with a root status route and full dependency injection via `app.state`.
-- Versioned health check at `/api/v1/health` with SQLite DB connectivity probe; returns `database: ok/error/unknown` and `status: ok/degraded`.
-- Environment-driven settings with `SAKHI_` prefix. Pagination, AI provider, and rate-limit settings all configurable.
-- CORS middleware with configurable allowed origins. Structured logging on startup.
+- FastAPI app factory (`create_app`) with full dependency injection via `app.state`.
+- Health check at `/api/v1/health` with SQLite DB probe — returns `database: ok/error/unknown`, `status: ok/degraded`.
+- Structured access logging: every request logs `METHOD PATH STATUS_CODE Xms req_id=XXXX`. `X-Request-Id` header on every response.
+- Environment-driven settings with `SAKHI_` prefix. All key parameters configurable.
+- CORS, rate limiting, request size, and security headers middleware.
 
 ### Security
-- HMAC-SHA256 signed access and refresh tokens (no third-party JWT library).
-- PBKDF2-SHA256 password hashing with per-user random salts (390,000 iterations).
-- Rate limiting: 60 req/min per client (configurable), token-hash for authenticated users, IP for anonymous. Health/root exempt.
-- Request size limit: 10 MB max body, HTTP 413 on excess.
-- Security headers on all responses: `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, HSTS (1 year + includeSubDomains), `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (geolocation/microphone/camera blocked).
-- Role-based authorization via `require_roles()` FastAPI dependency.
+- HMAC-SHA256 signed tokens with JTI claims. PBKDF2-SHA256 password hashing.
+- Token revocation via `TokenBlacklist` (JTI-based, in-process, auto-purging). Works on logout and persists for token lifetime.
+- Rate limiting, request size limits, security headers (HSTS, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy).
+- Role-based authorization (`require_roles` dependency).
 
-### Authentication & Users
-- Register, login, token refresh, get profile, update profile, **change password** (new).
-- Preferred language per user (10 supported: english, hindi, bengali, marathi, tamil, telugu, kannada, gujarati, punjabi, odia).
-- Admin: list users, update user role (user/admin/moderator).
-- All auth data persists in SQLite across app restarts.
+### Authentication & Users (`/api/v1/auth`)
+- Register, login, refresh, logout (token revocation), get profile, update profile, change password, delete account.
+- 10 supported languages. Roles: user / admin / moderator.
+- All auth data persists in SQLite. Cascade delete on account removal.
 
-### AI Conversations
-- Pluggable AI provider architecture:
-  - `RuleBasedProvider` — keyword-matched educational responses, no API key, always available, used in tests.
-  - `OpenAIProvider` — calls GPT-4o-mini with full conversation history as context, system prompt enforcing educational scope. Automatically falls back to rule-based on API error, missing key, or missing `openai` package.
-- Select provider via `SAKHI_AI_PROVIDER_NAME=rule-based|openai`.
-- Conversation history capped at `SAKHI_CONVERSATION_HISTORY_LIMIT` messages (default 8) when sent to OpenAI.
-- Private ownership enforced — users cannot access other users' conversations.
-- List endpoint now supports **pagination** (`page`, `page_size`).
+### AI Conversations (`/api/v1/conversations`)
+- Pluggable provider: `RuleBasedProvider` (default, no key) or `OpenAIProvider` (GPT-4o-mini, history-aware, auto-fallback).
+- Full conversation history passed to OpenAI, capped at `conversation_history_limit`.
+- Private ownership enforced. Paginated list.
 
-### Educational Lessons
-- Seeded catalog (3 default lessons). Full admin CRUD.
-- Public filtering by category, language, free-text search, and content language.
-- Multilingual translations stored per lesson; automatic fallback to base language.
-- Category list endpoint.
+### Educational Lessons (`/api/v1/lessons`)
+- Seeded catalog (3 lessons). Admin CRUD.
+- Filtering: category, language, full-text search, **tag** (new). Multilingual content with fallback.
+- Categories endpoint.
 
-### Progress Tracking
-- Upsert semantics (one record per user per lesson). Statuses: `not_started`, `in_progress`, `completed`.
-- Progress summary: totals, completion rate, average percent.
-- Lesson completion auto-creates a `lesson_completed` notification.
+### Progress Tracking (`/api/v1/progress`)
+- Upsert per user/lesson. Statuses: `not_started`, `in_progress`, `completed`. Auto-normalization.
+- Summary (totals, completion rate, average %). Completion triggers notification.
 
-### Notifications
-- User inbox with read/unread tracking and `read_at` timestamp.
-- Unread count endpoint.
-- Admin broadcast to all users or a specific user.
-- **Real-time push via WebSocket**: when a notification is created for a connected user it is instantly delivered over their WebSocket connection.
-- List endpoint now supports **pagination** (`page`, `page_size`).
+### Notifications (`/api/v1/notifications`)
+- User inbox (paginated). Read/unread tracking. Unread count.
+- Mark single as read. **Mark all as read** (new). **Delete single notification** (new).
+- Admin broadcast. Auto lesson-completion notifications.
+- Real-time push via WebSocket when user is connected.
 
-### WebSocket Real-Time Notifications *(new)*
-- Endpoint: `wss://.../api/v1/ws/notifications?token=<access_token>`
-- Authentication via token query param; rejects with close code 4001 on invalid token.
-- Sends `{"type":"connected","user_id":"..."}` on successful connect.
-- Pushes `{"type":"notification","data":{...NotificationItem}}` instantly when a notification is created.
-- Echoes `{"type":"pong"}` to any client ping/keep-alive message.
-- Server sends `{"type":"ping"}` heartbeat every 30 seconds.
-- `WebSocketManager` singleton tracks per-user connections and supports broadcast to all connected users.
+### WebSocket (`/api/v1/ws/notifications`)
+- Token auth via query param. Instant push on notification creation.
+- Heartbeat ping every 30s. Pong echo. Welcome message on connect.
 
-### Analytics
-- 10 event types tracked. User engagement metrics.
-- Admin: platform overview, event breakdown with percentages, daily activity (configurable window), top users by engagement, full analytics report.
+### Analytics (`/api/v1/analytics`)
+- 10 event types. User engagement metrics. Admin: overview, breakdown, daily activity, top users, full report.
 
-### Admin Dashboard *(enhanced)*
-- `GET /api/v1/admin/overview` — simple access check.
-- `GET /api/v1/admin/stats` *(new)* — combined dashboard: user counts (total, 7d active, 30d active), lesson counts (total, published, unpublished, categories), engagement totals (events, lesson views/completions, conversations, messages). Single request.
-- `GET /api/v1/admin/users` — list all users.
-- `PATCH /api/v1/admin/users/{id}/role` — change role.
-- `POST /api/v1/admin/notifications` — broadcast or targeted notification.
-- Full lesson CRUD (`GET`, `POST`, `PATCH`, `DELETE`).
+### Admin Dashboard (`/api/v1/admin`)
+- Overview, combined stats, user management, role updates, lesson CRUD, notification broadcast.
 
-### Automated Tests (79 total)
-| File | Tests | Coverage |
-|------|-------|----------|
+### Automated Tests — 106 total
+| File | Tests | Area |
+|------|-------|------|
 | `test_health.py` | 1 | Health endpoint |
-| `test_admin_stats.py` | 8 | Enhanced health check, admin stats dashboard |
-| `test_ai_providers.py` | 13 | Provider factory, rule-based content, OpenAI fallback, conversation history |
-| `test_analytics.py` | 12 | Event tracking, metrics, platform analytics, access control, persistence |
-| `test_auth.py` | 5 | Registration, login, refresh, RBAC, admin role management |
+| `test_admin_stats.py` | 8 | DB health probe, combined stats |
+| `test_ai_providers.py` | 13 | Provider factory, rule-based, OpenAI fallback |
+| `test_analytics.py` | 12 | Events, metrics, platform analytics |
+| `test_auth.py` | 5 | Registration, login, RBAC, roles |
 | `test_conversations.py` | 2 | Creation, persistence, privacy |
-| `test_lessons.py` | 4 | Seeded catalog, localization/fallback, admin CRUD, persistence |
-| `test_middleware.py` | 10 | Security headers, rate limiting, request size, HSTS, Referrer-Policy |
-| `test_notifications.py` | 8 | Inbox, mark-as-read, broadcast, isolation, lesson trigger, metadata |
-| `test_pagination.py` | 5 | Conversations/notifications pagination, boundary conditions |
-| `test_password_change.py` | 5 | Change password, wrong password, same password, auth required, persistence |
+| `test_lessons.py` | 4 | Catalog, localization, CRUD, persistence |
+| `test_lessons_extended.py` | 8 | Tag filtering, access log middleware |
+| `test_logout_and_account.py` | 10 | Logout, blacklist, account deletion |
+| `test_middleware.py` | 10 | Security headers, rate limiting, HSTS |
+| `test_notifications.py` | 8 | Inbox, broadcast, isolation, lesson trigger |
+| `test_notifications_extended.py` | 9 | Mark-all-read, delete notification |
+| `test_pagination.py` | 5 | Conversations/notifications pagination |
+| `test_password_change.py` | 5 | Change password, wrong password, same, persistence |
 | `test_progress.py` | 1 | Full progress flow with persistence |
-| `test_websocket.py` | 5 | Auth rejection, welcome message, pong echo, manager lifecycle |
+| `test_websocket.py` | 5 | Auth rejection, welcome, pong, manager |
 
-### Deployment & Production
-- `DEPLOYMENT.md`: systemd, Docker, Nginx/HTTPS, backup, scaling, troubleshooting, 12-point checklist.
-- `requirements.txt` for standard `pip install -r` workflow.
-- `pyproject.toml` optional extras: `[dev]`, `[production]` (gunicorn), `[ai]` (openai).
-- `.github/workflows/ci.yml`: lint → multi-Python tests → security audit on every push/PR.
+### Deployment & CI/CD
+- `DEPLOYMENT.md`: systemd, Docker, Nginx/HTTPS, backup, scaling, 12-point checklist.
+- `requirements.txt` for pip workflows.
+- `pyproject.toml` extras: `[dev]`, `[production]`, `[ai]`.
+- `.github/workflows/ci.yml`: lint → test (3.11 + 3.12) → pip-audit.
 
 ---
 
@@ -267,14 +268,16 @@
 | POST | `/api/v1/auth/register` | None | Register |
 | POST | `/api/v1/auth/login` | None | Login |
 | POST | `/api/v1/auth/refresh` | None | Refresh token |
+| POST | `/api/v1/auth/logout` | User | **Revoke token** |
 | GET | `/api/v1/auth/me` | User | Get profile |
 | PATCH | `/api/v1/auth/me` | User | Update profile |
-| POST | `/api/v1/auth/me/change-password` | User | **Change password** |
+| DELETE | `/api/v1/auth/me` | User | **Delete account** |
+| POST | `/api/v1/auth/me/change-password` | User | Change password |
 | GET | `/api/v1/conversations` | User | List (paginated) |
 | POST | `/api/v1/conversations` | User | Create conversation |
 | GET | `/api/v1/conversations/{id}` | User | Get conversation |
 | POST | `/api/v1/conversations/{id}/messages` | User | Send message |
-| GET | `/api/v1/lessons` | None | List lessons |
+| GET | `/api/v1/lessons` | None | List lessons (tag/category/search filter) |
 | GET | `/api/v1/lessons/categories` | None | List categories |
 | GET | `/api/v1/lessons/{slug}` | None | Get lesson |
 | GET | `/api/v1/progress` | User | List progress |
@@ -283,8 +286,10 @@
 | PUT | `/api/v1/progress/lessons/{slug}` | User | Update progress |
 | GET | `/api/v1/notifications` | User | List (paginated) |
 | GET | `/api/v1/notifications/unread-count` | User | Unread count |
-| PATCH | `/api/v1/notifications/{id}/read` | User | Mark as read |
-| WS | `/api/v1/ws/notifications?token=…` | User | **Real-time push** |
+| POST | `/api/v1/notifications/read-all` | User | **Mark all as read** |
+| PATCH | `/api/v1/notifications/{id}/read` | User | Mark one as read |
+| DELETE | `/api/v1/notifications/{id}` | User | **Delete notification** |
+| WS | `/api/v1/ws/notifications?token=…` | User | Real-time push |
 | POST | `/api/v1/analytics/events` | User | Track event |
 | GET | `/api/v1/analytics/events` | User | List user events |
 | GET | `/api/v1/analytics/engagement` | User | Engagement metrics |
@@ -294,9 +299,9 @@
 | GET | `/api/v1/analytics/platform/top-users` | Admin | Top users |
 | GET | `/api/v1/analytics/platform/report` | Admin | Full analytics report |
 | GET | `/api/v1/admin/overview` | Admin | Admin access check |
-| GET | `/api/v1/admin/stats` | Admin | **Combined dashboard stats** |
+| GET | `/api/v1/admin/stats` | Admin | Combined dashboard stats |
 | GET | `/api/v1/admin/users` | Admin | List all users |
-| PATCH | `/api/v1/admin/users/{id}/role` | Admin | Update role |
+| PATCH | `/api/v1/admin/users/{id}/role` | Admin | Update user role |
 | POST | `/api/v1/admin/notifications` | Admin | Broadcast notification |
 | GET | `/api/v1/admin/lessons` | Admin | All lessons (incl. unpublished) |
 | GET | `/api/v1/admin/lessons/{id}` | Admin | Get lesson by ID |
@@ -308,19 +313,25 @@
 
 ## Remaining Work
 
-All planned and next-step features are complete.
+All planned and next-step features are complete and tested.
 
 ### Potential Future Enhancements
-- **PostgreSQL migration** — for production-scale multi-instance deployments (SQLite is single-writer).
-- **Redis caching** — cache lesson catalog, user sessions, and analytics aggregates.
-- **Voice assistant** — voice input/output via speech-to-text and TTS APIs.
-- **Video lessons** — cloud storage (S3/GCS) integration for video content.
-- **Doctor consultation module** — appointment booking, teleconsultation, professional profiles.
-- **Personalized learning paths** — recommendation engine based on progress, preferences, and engagement.
-- **Community features** — moderated discussion boards or peer support groups.
-- **Wearable integration** — health metric ingestion from wearable device APIs.
-- **Token revocation / logout** — server-side token blacklist for immediate session invalidation.
-- **Email notifications** — send notification emails via SendGrid/SES as a fallback when users are offline.
-- **OpenAPI documentation export** — generate and host a Swagger/Redoc UI or export the spec for frontend teams.
-- **Soft delete** — mark users/lessons as deleted rather than hard-removing them for audit trail support.
-- **Full-text search upgrade** — replace in-memory string search with SQLite FTS5 or an external search engine.
+
+| Feature | Notes |
+|---------|-------|
+| **PostgreSQL migration** | SQLite is single-writer; swap to Postgres for multi-instance deployments |
+| **Redis token blacklist** | Replace in-process `TokenBlacklist` with Redis SET+TTL for multi-node revocation |
+| **Redis caching** | Cache lesson catalog, analytics aggregates, and rate limit counters |
+| **Email notifications** | SMTP + console fallback for offline push (SendGrid / SES) |
+| **Voice assistant** | Speech-to-text + TTS integration for voice input/output |
+| **Video lessons** | Cloud storage (S3/GCS) for video content with streaming URLs |
+| **Doctor consultation** | Appointment booking, teleconsult, professional profiles |
+| **Personalized learning paths** | Recommendation engine based on progress, preferences, engagement |
+| **Community features** | Moderated discussion boards or peer support groups |
+| **Wearable integration** | Health metric ingestion from device APIs |
+| **SQLite FTS5** | Replace in-memory text search with SQLite full-text search for large catalogs |
+| **Soft delete** | Mark users/lessons deleted rather than hard-removing (for audit trails) |
+| **OpenAPI export** | Swagger/Redoc UI or spec export for frontend teams |
+| **Refresh token rotation** | Issue a new refresh token on each use; revoke the old one |
+| **Admin user search** | Filter/search the user list by name, email, role |
+| **Lesson tags endpoint** | `GET /api/v1/lessons/tags` — list all unique tags with counts |

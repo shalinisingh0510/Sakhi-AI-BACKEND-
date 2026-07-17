@@ -38,7 +38,9 @@ class SQLiteLessonStore:
                     published INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
-                    created_by_user_id TEXT
+                    created_by_user_id TEXT,
+                    is_deleted INTEGER NOT NULL DEFAULT 0,
+                    deleted_at TEXT
                 )
                 """
             )
@@ -46,7 +48,8 @@ class SQLiteLessonStore:
             self._connection.execute("CREATE INDEX IF NOT EXISTS idx_lessons_language ON lessons(language)")
             self._connection.execute("CREATE INDEX IF NOT EXISTS idx_lessons_published ON lessons(published)")
             self._ensure_column("translations_json", "TEXT NOT NULL DEFAULT '{}'")
-
+            self._ensure_column("is_deleted", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column("deleted_at", "TEXT")
     def _ensure_column(self, column_name: str, column_definition: str) -> None:
         columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(lessons)").fetchall()}
         if column_name not in columns:
@@ -214,7 +217,7 @@ class SQLiteLessonStore:
     def get_by_id(self, lesson_id: str) -> StoredLesson | None:
         with self._lock:
             row = self._connection.execute(
-                "SELECT * FROM lessons WHERE id = ?",
+                "SELECT * FROM lessons WHERE id = ? AND is_deleted = 0",
                 (lesson_id,),
             ).fetchone()
         return None if row is None else self._row_to_lesson(row)
@@ -222,29 +225,25 @@ class SQLiteLessonStore:
     def get_by_slug(self, slug: str) -> StoredLesson | None:
         with self._lock:
             row = self._connection.execute(
-                "SELECT * FROM lessons WHERE slug = ?",
+                "SELECT * FROM lessons WHERE slug = ? AND is_deleted = 0",
                 (slug.strip().lower(),),
             ).fetchone()
         return None if row is None else self._row_to_lesson(row)
 
     def list_lessons(self, *, published_only: bool | None = None) -> list[StoredLesson]:
-        query = "SELECT * FROM lessons"
-        params: list[object] = []
+        conditions = ["is_deleted = 0"]
         if published_only is True:
-            query += " WHERE published = 1"
-        elif published_only is False:
-            query += " WHERE published IN (0, 1)"
-        query += " ORDER BY updated_at DESC"
-
+            conditions.append("published = 1")
+        query = f"SELECT * FROM lessons WHERE {' AND '.join(conditions)} ORDER BY updated_at DESC"
         with self._lock:
-            rows = self._connection.execute(query, params).fetchall()
+            rows = self._connection.execute(query).fetchall()
         return [self._row_to_lesson(row) for row in rows]
 
     def list_categories(self, *, published_only: bool = True) -> list[tuple[str, int]]:
-        query = "SELECT category, COUNT(*) AS count FROM lessons"
+        conditions = ["is_deleted = 0"]
         if published_only:
-            query += " WHERE published = 1"
-        query += " GROUP BY category ORDER BY category ASC"
+            conditions.append("published = 1")
+        query = f"SELECT category, COUNT(*) AS count FROM lessons WHERE {' AND '.join(conditions)} GROUP BY category ORDER BY category ASC"
         with self._lock:
             rows = self._connection.execute(query).fetchall()
         return [(row["category"], int(row["count"])) for row in rows]
@@ -312,7 +311,7 @@ class SQLiteLessonStore:
         try:
             with self._lock, self._connection:
                 cursor = self._connection.execute(
-                    f"UPDATE lessons SET {', '.join(updates)} WHERE id = ?",
+                    f"UPDATE lessons SET {', '.join(updates)} WHERE id = ? AND is_deleted = 0",
                     params,
                 )
         except sqlite3.IntegrityError as exc:
@@ -327,10 +326,12 @@ class SQLiteLessonStore:
         return lesson
 
     def delete_lesson(self, lesson_id: str) -> None:
+        """Soft-delete: mark lesson as deleted rather than removing the row."""
+        deleted_at = datetime.now(timezone.utc).isoformat()
         with self._lock, self._connection:
             cursor = self._connection.execute(
-                "DELETE FROM lessons WHERE id = ?",
-                (lesson_id,),
+                "UPDATE lessons SET is_deleted = 1, deleted_at = ?, published = 0 WHERE id = ? AND is_deleted = 0",
+                (deleted_at, lesson_id),
             )
         if cursor.rowcount == 0:
             raise RuntimeError("Lesson not found.")

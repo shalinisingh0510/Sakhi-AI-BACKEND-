@@ -230,6 +230,7 @@ class LessonService:
         category: str | None = None,
         language: str | None = None,
         search: str | None = None,
+        tag: str | None = None,
         content_language: str | None = None,
         published_only: bool = True,
     ) -> list[LessonSummary]:
@@ -238,6 +239,7 @@ class LessonService:
         normalized_language = self._normalize_language(language) if language else None
         normalized_content_language = self._normalize_language(content_language) if content_language else None
         normalized_search = search.strip().lower() if search else None
+        normalized_tag = tag.strip().lower() if tag else None
 
         filtered: list[StoredLesson] = []
         for lesson in lessons:
@@ -246,6 +248,8 @@ class LessonService:
             if normalized_language and lesson.language != normalized_language:
                 continue
             if normalized_search and normalized_search not in lesson.search_text():
+                continue
+            if normalized_tag and normalized_tag not in lesson.tags:
                 continue
             filtered.append(lesson)
         return [lesson.to_summary(normalized_content_language) for lesson in filtered]
@@ -266,6 +270,17 @@ class LessonService:
 
     def list_categories(self, *, published_only: bool = True) -> list[dict[str, int | str]]:
         return [{"name": category, "lesson_count": count} for category, count in self._store.list_categories(published_only=published_only)]
+
+    def list_tags(self, *, published_only: bool = True) -> list[dict[str, int | str]]:
+        """Return all unique tags with usage counts, sorted by count descending."""
+        from collections import Counter
+        lessons = self._store.list_lessons(published_only=published_only)
+        counter: Counter[str] = Counter()
+        for lesson in lessons:
+            for tag in lesson.tags:
+                if tag:
+                    counter[tag] += 1
+        return [{"name": tag, "lesson_count": count} for tag, count in counter.most_common()]
 
     def update_lesson(
         self,

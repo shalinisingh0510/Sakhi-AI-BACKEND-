@@ -30,12 +30,16 @@ class SQLiteAuthStore:
                     password_hash TEXT NOT NULL,
                     role TEXT NOT NULL,
                     preferred_language TEXT NOT NULL DEFAULT 'english',
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    is_deleted INTEGER NOT NULL DEFAULT 0,
+                    deleted_at TEXT
                 )
                 """
             )
             self._connection.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
             self._ensure_column("preferred_language", "TEXT NOT NULL DEFAULT 'english'")
+            self._ensure_column("is_deleted", "INTEGER NOT NULL DEFAULT 0")
+            self._ensure_column("deleted_at", "TEXT")
 
     def _ensure_column(self, column_name: str, column_definition: str) -> None:
         columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(users)").fetchall()}
@@ -102,7 +106,7 @@ class SQLiteAuthStore:
     def get_by_email(self, email: str) -> StoredUser | None:
         with self._lock:
             row = self._connection.execute(
-                "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE email = ?",
+                "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE email = ? AND is_deleted = 0",
                 (email.strip().lower(),),
             ).fetchone()
         return None if row is None else self._row_to_user(row)
@@ -110,7 +114,7 @@ class SQLiteAuthStore:
     def get_by_id(self, user_id: str) -> StoredUser | None:
         with self._lock:
             row = self._connection.execute(
-                "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE id = ?",
+                "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE id = ? AND is_deleted = 0",
                 (user_id,),
             ).fetchone()
         return None if row is None else self._row_to_user(row)
@@ -198,6 +202,34 @@ class SQLiteAuthStore:
     def list_users(self) -> list[StoredUser]:
         with self._lock:
             rows = self._connection.execute(
-                "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users ORDER BY created_at ASC"
+                "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE is_deleted = 0 ORDER BY created_at ASC"
             ).fetchall()
         return [self._row_to_user(row) for row in rows]
+
+    def search_users(self, *, query: str | None = None, role: str | None = None) -> list[StoredUser]:
+        conditions: list[str] = ["is_deleted = 0"]
+        params: list[object] = []
+        if role:
+            conditions.append("LOWER(role) = ?")
+            params.append(role.strip().lower())
+        if query:
+            q = f"%{query.strip().lower()}%"
+            conditions.append("(LOWER(name) LIKE ? OR LOWER(email) LIKE ?)")
+            params.extend([q, q])
+        sql = "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users"
+        sql += " WHERE " + " AND ".join(conditions)
+        sql += " ORDER BY created_at ASC"
+        with self._lock:
+            rows = self._connection.execute(sql, params).fetchall()
+        return [self._row_to_user(row) for row in rows]
+
+    def delete_user(self, *, user_id: str) -> None:
+        """Soft-delete: mark the user as deleted rather than removing the row."""
+        deleted_at = datetime.now(timezone.utc).isoformat()
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "UPDATE users SET is_deleted = 1, deleted_at = ? WHERE id = ? AND is_deleted = 0",
+                (deleted_at, user_id),
+            )
+        if cursor.rowcount == 0:
+            raise UserNotFoundError("User not found.")

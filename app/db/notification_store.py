@@ -143,3 +143,21 @@ class SQLiteNotificationStore:
         if notification is None:
             raise NotificationNotFoundError("Notification not found.")
         return notification
+
+    def mark_all_as_read(self, *, user_id: str) -> int:
+        timestamp = datetime.now(timezone.utc).isoformat()
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "UPDATE notifications SET is_read = 1, read_at = ? WHERE user_id = ? AND is_read = 0",
+                (timestamp, user_id),
+            )
+        return cursor.rowcount
+
+    def delete_notification(self, *, notification_id: str, user_id: str) -> None:
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "DELETE FROM notifications WHERE id = ? AND user_id = ?",
+                (notification_id, user_id),
+            )
+        if cursor.rowcount == 0:
+            raise NotificationNotFoundError("Notification not found.")

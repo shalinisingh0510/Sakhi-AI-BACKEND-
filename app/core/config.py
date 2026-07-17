@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     # Pagination defaults
     default_page_size: int = 20
     max_page_size: int = 100
+    # Email settings
+    email_backend: str = "console"        # "console" or "smtp"
+    email_host: str = ""
+    email_port: int = 587
+    email_username: str = ""
+    email_password: SecretStr = Field(default=SecretStr(""))
+    email_from: str = "noreply@sakhiai.com"
+    email_use_tls: bool = True
 
     model_config = SettingsConfigDict(
         env_prefix="SAKHI_",

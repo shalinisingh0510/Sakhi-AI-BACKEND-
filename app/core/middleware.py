@@ -145,3 +145,31 @@ async def request_size_middleware(request: Request, call_next: Callable) -> JSON
             pass
     
     return await call_next(request)
+
+
+import logging as _logging
+import time as _time
+import uuid as _uuid
+
+_access_logger = _logging.getLogger("sakhi.access")
+
+
+async def access_log_middleware(request: Request, call_next: Callable) -> JSONResponse:
+    """
+    Structured access log middleware.
+    Logs method, path, status code, duration, and a request-id on every request.
+    """
+    request_id = str(_uuid.uuid4())[:8]
+    start = _time.perf_counter()
+    response = await call_next(request)
+    duration_ms = round((_time.perf_counter() - start) * 1000, 1)
+    _access_logger.info(
+        "%s %s %s %sms req_id=%s",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration_ms,
+        request_id,
+    )
+    response.headers["X-Request-Id"] = request_id
+    return response

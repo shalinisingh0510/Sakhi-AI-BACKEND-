@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from app.core.config import Settings
 from app.core.security import build_token_claims, decode_token, encode_token, hash_password, verify_password
+from app.core.token_blacklist import TokenBlacklist
 from app.schemas.auth import PublicUser, SUPPORTED_LANGUAGES
 
 DEFAULT_PREFERRED_LANGUAGE = "english"
@@ -97,6 +98,11 @@ class AuthStoreProtocol(Protocol):
     def list_users(self) -> list[StoredUser]:
         ...
 
+    def search_users(self, *, query: str | None = None, role: str | None = None) -> list[StoredUser]:
+        ...
+
+    def delete_user(self, *, user_id: str) -> None:
+        ...
 
 @dataclass(slots=True)
 class AuthSession:
@@ -205,11 +211,35 @@ class InMemoryAuthStore:
         with self._lock:
             return sorted(self._users_by_id.values(), key=lambda user: user.created_at)
 
+    def search_users(self, *, query: str | None = None, role: str | None = None) -> list[StoredUser]:
+        with self._lock:
+            users = sorted(self._users_by_id.values(), key=lambda u: u.created_at)
+        if role:
+            users = [u for u in users if u.role.lower() == role.strip().lower()]
+        if query:
+            q = query.strip().lower()
+            users = [u for u in users if q in u.name.lower() or q in u.email.lower()]
+        return users
+
+    def delete_user(self, *, user_id: str) -> None:
+        with self._lock:
+            user = self._users_by_id.pop(user_id, None)
+            if user is None:
+                raise UserNotFoundError("User not found.")
+            self._users_by_email.pop(user.email, None)
+
 
 class AuthService:
-    def __init__(self, settings: Settings, store: AuthStoreProtocol | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        store: AuthStoreProtocol | None = None,
+        blacklist: TokenBlacklist | None = None,
+    ) -> None:
         self._settings = settings
         self._store = store or InMemoryAuthStore()
+        from app.core.token_blacklist import token_blacklist as _global_blacklist
+        self._blacklist: TokenBlacklist = blacklist or _global_blacklist
 
     @property
     def secret_key(self) -> str:
@@ -232,6 +262,8 @@ class AuthService:
 
     def refresh_session(self, *, refresh_token: str) -> AuthSession:
         user = self.resolve_current_user(refresh_token=refresh_token, token_type="refresh")
+        # Rotate: revoke the old refresh token so it cannot be reused
+        self.logout(access_token=refresh_token)
         return self._create_session(user)
 
     def update_profile(
@@ -277,6 +309,38 @@ class AuthService:
     def list_users(self) -> list[StoredUser]:
         return self._store.list_users()
 
+    def search_users(self, *, query: str | None = None, role: str | None = None) -> list[StoredUser]:
+        """Filter users by optional name/email search string and/or role."""
+        return self._store.search_users(query=query, role=role)
+
+    def delete_user(self, *, user_id: str) -> None:
+        """Permanently delete a user account."""
+        self._store.delete_user(user_id=user_id)
+
+    def logout(self, *, access_token: str) -> None:
+        """
+        Revoke an access token immediately by adding its JTI to the blacklist.
+        The token is decoded but expiry is not checked — even an expired token
+        is harmless to revoke.
+        """
+        try:
+            # Decode without expiry check so expired tokens can still be revoked
+            import base64, json as _json
+
+            def _b64decode(v: str) -> bytes:
+                padding = "=" * (-len(v) % 4)
+                return base64.urlsafe_b64decode(f"{v}{padding}")
+
+            parts = access_token.split(".")
+            if len(parts) == 3:
+                payload = _json.loads(_b64decode(parts[1]))
+                jti = payload.get("jti", "")
+                exp = float(payload.get("exp", 0))
+                if jti:
+                    self._blacklist.revoke(jti, exp)
+        except Exception:
+            pass  # Best-effort; never raise on logout
+
     def resolve_current_user(
         self,
         *,
@@ -292,6 +356,11 @@ class AuthService:
             claims = decode_token(token, self.secret_key, expected_token_type=token_type)
         except ValueError as exc:
             raise InvalidTokenError(str(exc)) from exc
+
+        # Check blacklist
+        jti = str(claims.get("jti", "")).strip()
+        if jti and self._blacklist.is_revoked(jti):
+            raise InvalidTokenError("Token has been revoked.")
 
         user_id = str(claims.get("sub", "")).strip()
         if not user_id:

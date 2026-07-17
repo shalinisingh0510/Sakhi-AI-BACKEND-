@@ -67,10 +67,16 @@ def admin_stats(
 
 @router.get("/users", response_model=list[PublicUser])
 def list_users(
+    search: str | None = Query(default=None, description="Filter by name or email (case-insensitive)"),
+    role: str | None = Query(default=None, description="Filter by role: user, admin, moderator"),
     _current_user: StoredUser = Depends(require_roles("admin")),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> list[PublicUser]:
-    return [user.to_public_user() for user in auth_service.list_users()]
+    if search or role:
+        users = auth_service.search_users(query=search, role=role)
+    else:
+        users = auth_service.list_users()
+    return [user.to_public_user() for user in users]
 
 
 @router.patch("/users/{user_id}/role", response_model=PublicUser)

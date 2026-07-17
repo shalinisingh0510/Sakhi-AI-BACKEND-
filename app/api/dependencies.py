@@ -34,6 +34,10 @@ def get_analytics_service(request: Request) -> AnalyticsService:
     return request.app.state.analytics_service
 
 
+def get_email_service(request: Request):
+    return request.app.state.email_service
+
+
 def get_current_user(
     authorization: str | None = Header(default=None),
     auth_service: AuthService = Depends(get_auth_service),

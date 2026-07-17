@@ -64,6 +64,13 @@ class NotificationStoreProtocol(Protocol):
     def mark_as_read(self, *, notification_id: str, user_id: str) -> StoredNotification:
         ...
 
+    def mark_all_as_read(self, *, user_id: str) -> int:
+        """Mark all unread notifications as read. Returns the count of updated rows."""
+        ...
+
+    def delete_notification(self, *, notification_id: str, user_id: str) -> None:
+        ...
+
 
 class NotificationService:
     def __init__(self, settings: Settings, store: NotificationStoreProtocol) -> None:
@@ -156,4 +163,12 @@ class NotificationService:
         except RuntimeError as exc:
             raise NotificationNotFoundError(str(exc)) from exc
         return record.to_item()
+
+    def mark_all_as_read(self, *, user_id: str) -> int:
+        """Mark every unread notification as read. Returns updated count."""
+        return self._store.mark_all_as_read(user_id=user_id)
+
+    def delete_notification(self, *, notification_id: str, user_id: str) -> None:
+        """Delete a single notification. Raises NotificationNotFoundError if not found."""
+        self._store.delete_notification(notification_id=notification_id, user_id=user_id)
 

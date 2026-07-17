@@ -14,11 +14,18 @@ def list_lessons(
     category: str | None = Query(default=None),
     language: str | None = Query(default=None),
     search: str | None = Query(default=None),
+    tag: str | None = Query(default=None, description="Filter by a single tag"),
     content_language: str | None = Query(default=None),
     lesson_service: LessonService = Depends(get_lesson_service),
 ) -> list[LessonSummary]:
     try:
-        return lesson_service.list_lessons(category=category, language=language, search=search, content_language=content_language)
+        return lesson_service.list_lessons(
+            category=category,
+            language=language,
+            search=search,
+            tag=tag,
+            content_language=content_language,
+        )
     except InvalidLessonContentError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -26,6 +33,12 @@ def list_lessons(
 @router.get("/categories")
 def list_categories(lesson_service: LessonService = Depends(get_lesson_service)) -> list[dict[str, int | str]]:
     return lesson_service.list_categories()
+
+
+@router.get("/tags")
+def list_tags(lesson_service: LessonService = Depends(get_lesson_service)) -> list[dict[str, int | str]]:
+    """Return all unique tags across published lessons with their usage counts."""
+    return lesson_service.list_tags()
 
 
 @router.get("/{slug}", response_model=LessonDetail)

@@ -29,6 +29,16 @@ def unread_count(
     return UnreadCountResponse(unread_count=notification_service.count_unread(user_id=current_user.id))
 
 
+@router.post("/read-all", status_code=status.HTTP_200_OK)
+def mark_all_notifications_read(
+    current_user: StoredUser = Depends(get_current_user),
+    notification_service: NotificationService = Depends(get_notification_service),
+) -> dict[str, int]:
+    """Mark every unread notification as read. Returns the count of notifications updated."""
+    updated = notification_service.mark_all_as_read(user_id=current_user.id)
+    return {"updated_count": updated}
+
+
 @router.patch("/{notification_id}/read", response_model=NotificationItem)
 def mark_notification_read(
     notification_id: str,
@@ -37,5 +47,18 @@ def mark_notification_read(
 ) -> NotificationItem:
     try:
         return notification_service.mark_as_read(notification_id=notification_id, user_id=current_user.id)
+    except NotificationNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.delete("/{notification_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_notification(
+    notification_id: str,
+    current_user: StoredUser = Depends(get_current_user),
+    notification_service: NotificationService = Depends(get_notification_service),
+) -> None:
+    """Permanently delete a notification from the user's inbox."""
+    try:
+        notification_service.delete_notification(notification_id=notification_id, user_id=current_user.id)
     except NotificationNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

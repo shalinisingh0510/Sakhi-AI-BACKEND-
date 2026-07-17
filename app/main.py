@@ -6,11 +6,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
-from app.core.middleware import configure_rate_limiter, rate_limit_middleware, request_size_middleware, security_headers_middleware
+from app.core.middleware import (
+    access_log_middleware,
+    configure_rate_limiter,
+    rate_limit_middleware,
+    request_size_middleware,
+    security_headers_middleware,
+)
 from app.db import SQLiteAuthStore, SQLiteAnalyticsStore, SQLiteConversationStore, SQLiteLessonStore, SQLiteNotificationStore, SQLiteProgressStore
 from app.services.ai import AIService
 from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService, AuthStoreProtocol
+from app.services.email import EmailService, build_email_backend
 from app.services.lessons import LessonService
 from app.services.notifications import NotificationService
 from app.services.progress import ProgressService
@@ -49,6 +56,18 @@ def create_app(
     app.state.analytics_store = SQLiteAnalyticsStore(settings.database_path)
     app.state.analytics_service = AnalyticsService(settings, store=app.state.analytics_store)
 
+    # Email service
+    email_backend = build_email_backend(
+        settings.email_backend,
+        host=settings.email_host,
+        port=settings.email_port,
+        username=settings.email_username,
+        password=settings.email_password.get_secret_value(),
+        sender=settings.email_from,
+        use_tls=settings.email_use_tls,
+    )
+    app.state.email_service = EmailService(backend=email_backend)
+
     # Configure rate limiter from settings
     configure_rate_limiter(settings.rate_limit_requests_per_minute)
 
@@ -60,10 +79,11 @@ def create_app(
         allow_headers=["*"],
     )
 
-    # Add security middleware
+    # Add security middleware (applied in reverse registration order)
     app.middleware("http")(security_headers_middleware)
     app.middleware("http")(request_size_middleware)
     app.middleware("http")(rate_limit_middleware)
+    app.middleware("http")(access_log_middleware)
 
     app.include_router(api_router)
 
