@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Phase 16 complete. 120 tests passing. Backend is production-ready with a comprehensive feature set.**
+**Phase 17 complete. 121 tests passing. Backend is production-ready with a comprehensive feature set.**
 
 ---
 
@@ -87,7 +87,7 @@
 - **`LessonService.list_lessons`** extended with `tag` parameter.
 - **Structured access log middleware** (`access_log_middleware`): logs `METHOD PATH STATUS_CODE Xms req_id=XXXX` for every request. Adds `X-Request-Id` header to every response for tracing.
 - **Wired `access_log_middleware`** into `app/main.py`.
-- **New tests**: `test_logout_and_account.py` (10), `test_notifications_extended.py` (9), `test_lessons_extended.py` (8), `test_openapi_export.py` (1), `test_email_notifications.py` (2), `test_redis_token_blacklist.py` (4), `test_cache_backend.py` (3), `test_cached_services.py` (2). Total: **118 tests passing**.
+- **New tests**: `test_logout_and_account.py` (11), `test_notifications_extended.py` (9), `test_lessons_extended.py` (8), `test_openapi_export.py` (1), `test_email_notifications.py` (2), `test_redis_token_blacklist.py` (4), `test_cache_backend.py` (3), `test_cached_services.py` (3). Total: **121 tests passing**.
 
 ### Phase 12 - API Discoverability
 - Added a versioned OpenAPI export endpoint (`GET /api/v1/openapi.json`) for frontend and integration consumers.
@@ -115,6 +115,12 @@
 - Added a SQLite FTS5-backed lesson search index that stays in sync on lesson create, update, and delete.
 - Lesson search now uses indexed lookup when available and falls back safely to the previous text scan when FTS5 is not compiled into SQLite.
 - Added tests covering indexed search usage and public search results for newly created lessons.
+
+---
+### Phase 17 - User Soft Delete Refinement
+- Converted account deletion into a soft-delete flow that preserves the row for auditability.
+- Deleted emails are tombstoned so the original address can be registered again later.
+- Added a regression test proving the same email can be reused after deletion.
 
 ---
 
@@ -235,6 +241,7 @@
 - Refresh token rotation is enforced: each refresh invalidates the previous refresh token, and the behavior is covered by regression tests.
 - 10 supported languages. Roles: user / admin / moderator.
 - All auth data persists in SQLite. Cascade delete on account removal.
+- Account deletion now soft-deletes the row, preserves an audit trail, and frees the email for reuse.
 
 ### AI Conversations (`/api/v1/conversations`)
 - Pluggable provider: `RuleBasedProvider` (default, no key) or `OpenAIProvider` (GPT-4o-mini, history-aware, auto-fallback).
@@ -267,7 +274,7 @@
 ### Admin Dashboard (`/api/v1/admin`)
 - Overview, combined stats, user management, role updates, lesson CRUD, notification broadcast.
 
-### Automated Tests - 118 total
+### Automated Tests - 121 total
 | File | Tests | Area |
 |------|-------|------|
 | `test_health.py` | 1 | Health endpoint |
@@ -278,7 +285,7 @@
 | `test_conversations.py` | 2 | Creation, persistence, privacy |
 | `test_lessons.py` | 5 | Catalog, localization, search, CRUD, persistence |
 | `test_lessons_extended.py` | 8 | Tag filtering, access log middleware |
-| `test_logout_and_account.py` | 10 | Logout, blacklist, account deletion |
+| `test_logout_and_account.py` | 11 | Logout, blacklist, account deletion, soft delete |
 | `test_middleware.py` | 10 | Security headers, rate limiting, HSTS |
 | `test_notifications.py` | 8 | Inbox, broadcast, isolation, lesson trigger |
 | `test_notifications_extended.py` | 9 | Mark-all-read, delete notification |
@@ -368,6 +375,5 @@ All planned and next-step features are complete and tested.
 | **Personalized learning paths** | Recommendation engine based on progress, preferences, engagement |
 | **Community features** | Moderated discussion boards or peer support groups |
 | **Wearable integration** | Health metric ingestion from device APIs |
-| **Soft delete** | Mark users/lessons deleted rather than hard-removing (for audit trails) |
 
 

@@ -32,7 +32,8 @@ class SQLiteAuthStore:
                     preferred_language TEXT NOT NULL DEFAULT 'english',
                     created_at TEXT NOT NULL,
                     is_deleted INTEGER NOT NULL DEFAULT 0,
-                    deleted_at TEXT
+                    deleted_at TEXT,
+                    deleted_email TEXT
                 )
                 """
             )
@@ -40,6 +41,7 @@ class SQLiteAuthStore:
             self._ensure_column("preferred_language", "TEXT NOT NULL DEFAULT 'english'")
             self._ensure_column("is_deleted", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column("deleted_at", "TEXT")
+            self._ensure_column("deleted_email", "TEXT")
 
     def _ensure_column(self, column_name: str, column_definition: str) -> None:
         columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(users)").fetchall()}
@@ -82,8 +84,8 @@ class SQLiteAuthStore:
             with self._lock, self._connection:
                 self._connection.execute(
                     """
-                    INSERT INTO users (id, name, email, password_hash, role, preferred_language, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (id, name, email, password_hash, role, preferred_language, created_at, deleted_email)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         user_id,
@@ -93,6 +95,7 @@ class SQLiteAuthStore:
                         normalized_role,
                         normalized_language,
                         created_at,
+                        None,
                     ),
                 )
         except sqlite3.IntegrityError as exc:
@@ -226,10 +229,11 @@ class SQLiteAuthStore:
     def delete_user(self, *, user_id: str) -> None:
         """Soft-delete: mark the user as deleted rather than removing the row."""
         deleted_at = datetime.now(timezone.utc).isoformat()
+        tombstone_email = f"deleted-{user_id}@deleted.local"
         with self._lock, self._connection:
             cursor = self._connection.execute(
-                "UPDATE users SET is_deleted = 1, deleted_at = ? WHERE id = ? AND is_deleted = 0",
-                (deleted_at, user_id),
+                "UPDATE users SET is_deleted = 1, deleted_at = ?, deleted_email = email, email = ? WHERE id = ? AND is_deleted = 0",
+                (deleted_at, tombstone_email, user_id),
             )
         if cursor.rowcount == 0:
             raise UserNotFoundError("User not found.")

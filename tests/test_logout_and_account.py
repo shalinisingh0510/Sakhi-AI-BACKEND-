@@ -164,6 +164,21 @@ def test_account_deletion_persists_across_restart(tmp_path: Path) -> None:
     ).status_code == 401
 
 
+def test_deleted_account_email_can_be_reused(tmp_path: Path) -> None:
+    client = build_client(tmp_path / "delete-reuse.sqlite3")
+
+    reg = client.post("/api/v1/auth/register", json=REGISTER_USER)
+    assert reg.status_code == 201
+    token = reg.json()["access_token"]
+
+    delete_response = client.delete("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert delete_response.status_code == 204
+
+    rerun = client.post("/api/v1/auth/register", json=REGISTER_USER)
+    assert rerun.status_code == 201
+    assert rerun.json()["user"]["email"] == REGISTER_USER["email"]
+
+
 def test_admin_delete_does_not_affect_other_users(tmp_path: Path) -> None:
     """Deleting one user account must not remove other accounts."""
     client = build_client(tmp_path / "delete-isolation.sqlite3")
