@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,8 +18,11 @@ class SQLiteLessonStore:
         self._connection = sqlite3.connect(self._database_path, check_same_thread=False)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute("PRAGMA foreign_keys = ON")
+        self._fts_enabled = False
         self._initialize_schema()
         self._seed_default_lessons()
+        if self._fts_enabled:
+            self._rebuild_search_index()
 
     def _initialize_schema(self) -> None:
         with self._lock, self._connection:
@@ -50,10 +54,77 @@ class SQLiteLessonStore:
             self._ensure_column("translations_json", "TEXT NOT NULL DEFAULT '{}'")
             self._ensure_column("is_deleted", "INTEGER NOT NULL DEFAULT 0")
             self._ensure_column("deleted_at", "TEXT")
+            try:
+                self._connection.execute(
+                    """
+                    CREATE VIRTUAL TABLE IF NOT EXISTS lesson_search_index
+                    USING fts5(lesson_id UNINDEXED, search_text)
+                    """
+                )
+                self._fts_enabled = True
+            except sqlite3.OperationalError:
+                self._fts_enabled = False
+
     def _ensure_column(self, column_name: str, column_definition: str) -> None:
         columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(lessons)").fetchall()}
         if column_name not in columns:
             self._connection.execute(f"ALTER TABLE lessons ADD COLUMN {column_name} {column_definition}")
+
+    def _build_search_text(self, lesson: StoredLesson) -> str:
+        return lesson.search_text()
+
+    def _get_rowid(self, lesson_id: str) -> int | None:
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT rowid FROM lessons WHERE id = ? AND is_deleted = 0",
+                (lesson_id,),
+            ).fetchone()
+        return None if row is None else int(row["rowid"])
+
+    def _sync_search_index(self, lesson: StoredLesson) -> None:
+        if not self._fts_enabled:
+            return
+
+        rowid = self._get_rowid(lesson.id)
+        if rowid is None:
+            return
+
+        with self._lock, self._connection:
+            self._connection.execute("DELETE FROM lesson_search_index WHERE rowid = ?", (rowid,))
+            self._connection.execute(
+                """
+                INSERT INTO lesson_search_index (rowid, lesson_id, search_text)
+                VALUES (?, ?, ?)
+                """,
+                (rowid, lesson.id, self._build_search_text(lesson)),
+            )
+
+    def _delete_search_index(self, lesson_id: str) -> None:
+        if not self._fts_enabled:
+            return
+
+        rowid = self._get_rowid(lesson_id)
+        if rowid is None:
+            return
+        with self._lock, self._connection:
+            self._connection.execute("DELETE FROM lesson_search_index WHERE rowid = ?", (rowid,))
+
+    def _rebuild_search_index(self) -> None:
+        if not self._fts_enabled:
+            return
+
+        with self._lock, self._connection:
+            self._connection.execute("DELETE FROM lesson_search_index")
+            rows = self._connection.execute("SELECT rowid, * FROM lessons WHERE is_deleted = 0").fetchall()
+            for row in rows:
+                lesson = self._row_to_lesson(row)
+                self._connection.execute(
+                    """
+                    INSERT INTO lesson_search_index (rowid, lesson_id, search_text)
+                    VALUES (?, ?, ?)
+                    """,
+                    (int(row["rowid"]), lesson.id, self._build_search_text(lesson)),
+                )
 
     def _seed_default_lessons(self) -> None:
         with self._lock:
@@ -212,6 +283,7 @@ class SQLiteLessonStore:
         lesson = self.get_by_id(lesson_id)
         if lesson is None:
             raise RuntimeError("Stored lesson could not be loaded after insertion.")
+        self._sync_search_index(lesson)
         return lesson
 
     def get_by_id(self, lesson_id: str) -> StoredLesson | None:
@@ -237,6 +309,35 @@ class SQLiteLessonStore:
         query = f"SELECT * FROM lessons WHERE {' AND '.join(conditions)} ORDER BY updated_at DESC"
         with self._lock:
             rows = self._connection.execute(query).fetchall()
+        return [self._row_to_lesson(row) for row in rows]
+
+    def search_lessons(self, query: str, *, published_only: bool | None = None) -> list[StoredLesson]:
+        normalized_query = query.strip().lower()
+        if not normalized_query:
+            return self.list_lessons(published_only=published_only)
+
+        if not self._fts_enabled:
+            lessons = self.list_lessons(published_only=published_only)
+            return [lesson for lesson in lessons if normalized_query in lesson.search_text()]
+
+        tokens = re.findall(r"[\w]+", normalized_query, flags=re.UNICODE)
+        if not tokens:
+            return []
+        fts_query = " AND ".join(f"{token}*" for token in tokens)
+
+        conditions = ["lesson_search_index MATCH ?", "l.is_deleted = 0"]
+        params: list[object] = [fts_query]
+        if published_only is True:
+            conditions.append("l.published = 1")
+        query_sql = f"""
+            SELECT l.*
+            FROM lesson_search_index
+            JOIN lessons l ON l.rowid = lesson_search_index.rowid
+            WHERE {' AND '.join(conditions)}
+            ORDER BY l.updated_at DESC
+        """
+        with self._lock:
+            rows = self._connection.execute(query_sql, params).fetchall()
         return [self._row_to_lesson(row) for row in rows]
 
     def list_categories(self, *, published_only: bool = True) -> list[tuple[str, int]]:
@@ -323,15 +424,20 @@ class SQLiteLessonStore:
         lesson = self.get_by_id(lesson_id)
         if lesson is None:
             raise RuntimeError("Lesson not found.")
+        self._sync_search_index(lesson)
         return lesson
 
     def delete_lesson(self, lesson_id: str) -> None:
         """Soft-delete: mark lesson as deleted rather than removing the row."""
         deleted_at = datetime.now(timezone.utc).isoformat()
         with self._lock, self._connection:
+            rowid = self._get_rowid(lesson_id)
             cursor = self._connection.execute(
                 "UPDATE lessons SET is_deleted = 1, deleted_at = ?, published = 0 WHERE id = ? AND is_deleted = 0",
                 (deleted_at, lesson_id),
             )
         if cursor.rowcount == 0:
             raise RuntimeError("Lesson not found.")
+        if rowid is not None and self._fts_enabled:
+            with self._lock, self._connection:
+                self._connection.execute("DELETE FROM lesson_search_index WHERE rowid = ?", (rowid,))

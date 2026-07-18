@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Phase 15 complete. 118 tests passing. Backend is production-ready with a comprehensive feature set.**
+**Phase 16 complete. 120 tests passing. Backend is production-ready with a comprehensive feature set.**
 
 ---
 
@@ -109,6 +109,12 @@
 - Cached lesson catalog, lesson detail, category, and tag reads with invalidation on lesson mutations.
 - Cached analytics overview and report inputs with invalidation on event tracking.
 - Added tests covering cache backend behavior and service-level cache hits/invalidation.
+
+---
+### Phase 16 - SQLite FTS5 Search Acceleration
+- Added a SQLite FTS5-backed lesson search index that stays in sync on lesson create, update, and delete.
+- Lesson search now uses indexed lookup when available and falls back safely to the previous text scan when FTS5 is not compiled into SQLite.
+- Added tests covering indexed search usage and public search results for newly created lessons.
 
 ---
 
@@ -269,7 +275,7 @@
 | `test_analytics.py` | 12 | Events, metrics, platform analytics |
 | `test_auth.py` | 5 | Registration, login, RBAC, roles |
 | `test_conversations.py` | 2 | Creation, persistence, privacy |
-| `test_lessons.py` | 4 | Catalog, localization, CRUD, persistence |
+| `test_lessons.py` | 5 | Catalog, localization, search, CRUD, persistence |
 | `test_lessons_extended.py` | 8 | Tag filtering, access log middleware |
 | `test_logout_and_account.py` | 10 | Logout, blacklist, account deletion |
 | `test_middleware.py` | 10 | Security headers, rate limiting, HSTS |
@@ -283,7 +289,7 @@
 | `test_email_notifications.py` | 2 | Email delivery integration |
 | `test_redis_token_blacklist.py` | 4 | Redis blacklist backend |
 | `test_cache_backend.py` | 3 | Cache backend factory and storage |
-| `test_cached_services.py` | 2 | Lesson and analytics cache invalidation |
+| `test_cached_services.py` | 3 | Lesson/search and analytics cache invalidation |
 
 ### Deployment & CI/CD
 - `DEPLOYMENT.md`: systemd, Docker, Nginx/HTTPS, backup, scaling, 12-point checklist.

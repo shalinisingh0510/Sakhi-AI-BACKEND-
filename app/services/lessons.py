@@ -163,6 +163,9 @@ class LessonStoreProtocol(Protocol):
     def list_lessons(self, *, published_only: bool | None = None) -> list[StoredLesson]:
         ...
 
+    def search_lessons(self, query: str, *, published_only: bool | None = None) -> list[StoredLesson]:
+        ...
+
     def list_categories(self, *, published_only: bool = True) -> list[tuple[str, int]]:
         ...
 
@@ -260,14 +263,16 @@ class LessonService:
         if cached is not None:
             return [LessonSummary.model_validate(item) for item in cached]
 
-        lessons = self._store.list_lessons(published_only=published_only)
+        if normalized_search:
+            lessons = self._store.search_lessons(normalized_search, published_only=published_only)
+        else:
+            lessons = self._store.list_lessons(published_only=published_only)
+
         filtered: list[StoredLesson] = []
         for lesson in lessons:
             if normalized_category and lesson.category != normalized_category:
                 continue
             if normalized_language and lesson.language != normalized_language:
-                continue
-            if normalized_search and normalized_search not in lesson.search_text():
                 continue
             if normalized_tag and normalized_tag not in lesson.tags:
                 continue

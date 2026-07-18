@@ -36,6 +36,42 @@ def test_public_lesson_catalog_exposes_seeded_content(tmp_path: Path) -> None:
     assert "menstrual-health" in categories
 
 
+
+def test_public_lesson_search_finds_new_content(tmp_path: Path) -> None:
+    client = build_client(tmp_path / "search-lessons.sqlite3")
+
+    admin_response = client.post("/api/v1/auth/register", json=REGISTER_ADMIN)
+    assert admin_response.status_code == 201
+    admin_token = admin_response.json()["access_token"]
+
+    create_response = client.post(
+        "/api/v1/admin/lessons",
+        json={
+            "title": "Evening Wind-Down",
+            "slug": "evening-wind-down",
+            "category": "wellbeing",
+            "summary": "A short routine for calmer evenings.",
+            "language": "english",
+            "audience": "general",
+            "tags": ["sleep", "calm"],
+            "published": True,
+            "sections": [
+                {
+                    "heading": "Quiet pause",
+                    "body": "A moonstone moment can help the body settle before sleep.",
+                },
+            ],
+        },
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert create_response.status_code == 201
+
+    search_response = client.get("/api/v1/lessons?search=moonstone")
+    assert search_response.status_code == 200
+    results = search_response.json()
+    assert any(lesson["slug"] == "evening-wind-down" for lesson in results)
+
+
 def test_lesson_can_return_localized_content_and_fallback(tmp_path: Path) -> None:
     client = build_client(tmp_path / "localized-lessons.sqlite3")
 
