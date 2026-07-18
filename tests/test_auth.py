@@ -66,7 +66,21 @@ def test_auth_registration_login_profile_and_preference_update_flow(tmp_path: Pa
         json={"refresh_token": register_payload["refresh_token"]},
     )
     assert refresh_response.status_code == 200
-    assert refresh_response.json()["user"]["email"] == REGISTER_USER["email"]
+    refreshed_payload = refresh_response.json()
+    assert refreshed_payload["user"]["email"] == REGISTER_USER["email"]
+    assert refreshed_payload["refresh_token"] != register_payload["refresh_token"]
+
+    reused_refresh_response = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": register_payload["refresh_token"]},
+    )
+    assert reused_refresh_response.status_code == 401
+
+    second_refresh_response = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": refreshed_payload["refresh_token"]},
+    )
+    assert second_refresh_response.status_code == 200
 
 
 def test_registered_user_persists_across_app_instances(tmp_path: Path) -> None:

@@ -232,6 +232,7 @@
 
 ### Authentication & Users (`/api/v1/auth`)
 - Register, login, refresh, logout (token revocation), get profile, update profile, change password, delete account.
+- Refresh token rotation is enforced: each refresh invalidates the previous refresh token, and the behavior is covered by regression tests.
 - 10 supported languages. Roles: user / admin / moderator.
 - All auth data persists in SQLite. Cascade delete on account removal.
 
@@ -367,10 +368,6 @@ All planned and next-step features are complete and tested.
 | **Personalized learning paths** | Recommendation engine based on progress, preferences, engagement |
 | **Community features** | Moderated discussion boards or peer support groups |
 | **Wearable integration** | Health metric ingestion from device APIs |
-| **SQLite FTS5** | Replace in-memory text search with SQLite full-text search for large catalogs |
 | **Soft delete** | Mark users/lessons deleted rather than hard-removing (for audit trails) |
-| **Refresh token rotation** | Issue a new refresh token on each use; revoke the old one |
-| **Admin user search** | Filter/search the user list by name, email, role |
-| **Lesson tags endpoint** | `GET /api/v1/lessons/tags` — list all unique tags with counts |
 
 
