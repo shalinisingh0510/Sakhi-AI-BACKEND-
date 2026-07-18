@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     access_token_minutes: int = 60
     refresh_token_days: int = 7
     rate_limit_requests_per_minute: int = 60
+    # Token blacklist backend: "memory" (default) or "redis"
+    token_blacklist_backend: str = "memory"
+    # Cache backend: "memory" (default) or "redis"
+    cache_backend: str = "memory"
+    redis_url: str = "redis://localhost:6379/0"
+    redis_token_blacklist_prefix: str = "sakhi:token-blacklist"
+    redis_cache_prefix: str = "sakhi:cache"
+    cache_ttl_seconds: int = 300
     # Pagination defaults
     default_page_size: int = 20
     max_page_size: int = 100
@@ -70,6 +78,7 @@ class Settings(BaseSettings):
         "access_token_minutes",
         "refresh_token_days",
         "conversation_history_limit",
+        "cache_ttl_seconds",
         "default_page_size",
         "max_page_size",
         mode="before",

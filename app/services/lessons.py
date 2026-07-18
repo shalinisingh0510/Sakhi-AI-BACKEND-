@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import re
 from threading import RLock
 from typing import Protocol
 from uuid import uuid4
 
+from app.core.cache import CacheBackendProtocol, build_cache_key
 from app.core.config import Settings
 from app.schemas.auth import SUPPORTED_LANGUAGES
 from app.schemas.lesson import LessonDetail, LessonSection, LessonSummary, LessonTranslationRequest
@@ -186,9 +188,12 @@ class LessonStoreProtocol(Protocol):
 
 
 class LessonService:
-    def __init__(self, settings: Settings, store: LessonStoreProtocol) -> None:
+    def __init__(self, settings: Settings, store: LessonStoreProtocol, cache: CacheBackendProtocol | None = None) -> None:
         self._settings = settings
         self._store = store
+        self._cache = cache
+        self._cache_namespace = "lessons"
+        self._cache_ttl = settings.cache_ttl_seconds
 
     def create_lesson(
         self,
@@ -222,6 +227,7 @@ class LessonService:
             published=published,
             created_by_user_id=created_by_user_id,
         )
+        self._invalidate_cache()
         return stored
 
     def list_lessons(
@@ -234,13 +240,27 @@ class LessonService:
         content_language: str | None = None,
         published_only: bool = True,
     ) -> list[LessonSummary]:
-        lessons = self._store.list_lessons(published_only=published_only)
         normalized_category = category.strip().lower() if category else None
         normalized_language = self._normalize_language(language) if language else None
         normalized_content_language = self._normalize_language(content_language) if content_language else None
         normalized_search = search.strip().lower() if search else None
         normalized_tag = tag.strip().lower() if tag else None
+        cache_key = build_cache_key(
+            self._cache_namespace,
+            self._cache_version(),
+            "list_lessons",
+            normalized_category,
+            normalized_language,
+            normalized_search,
+            normalized_tag,
+            normalized_content_language,
+            published_only,
+        )
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return [LessonSummary.model_validate(item) for item in cached]
 
+        lessons = self._store.list_lessons(published_only=published_only)
         filtered: list[StoredLesson] = []
         for lesson in lessons:
             if normalized_category and lesson.category != normalized_category:
@@ -252,35 +272,79 @@ class LessonService:
             if normalized_tag and normalized_tag not in lesson.tags:
                 continue
             filtered.append(lesson)
-        return [lesson.to_summary(normalized_content_language) for lesson in filtered]
+        result = [lesson.to_summary(normalized_content_language) for lesson in filtered]
+        self._cache_set(cache_key, [lesson.model_dump(mode="json") for lesson in result])
+        return result
 
     def get_lesson(self, *, slug: str, content_language: str | None = None, published_only: bool = True) -> LessonDetail:
-        lesson = self._store.get_by_slug(slug.strip().lower())
+        normalized_slug = slug.strip().lower()
+        normalized_content_language = self._normalize_language(content_language) if content_language else None
+        cache_key = build_cache_key(
+            self._cache_namespace,
+            self._cache_version(),
+            "get_lesson",
+            normalized_slug,
+            normalized_content_language,
+            published_only,
+        )
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return LessonDetail.model_validate(cached)
+
+        lesson = self._store.get_by_slug(normalized_slug)
         if lesson is None or (published_only and not lesson.published):
             raise LessonNotFoundError("Lesson not found.")
-        normalized_content_language = self._normalize_language(content_language) if content_language else None
-        return lesson.to_detail(normalized_content_language)
+        detail = lesson.to_detail(normalized_content_language)
+        self._cache_set(cache_key, detail.model_dump(mode="json"))
+        return detail
 
     def get_lesson_by_id(self, lesson_id: str, *, content_language: str | None = None) -> LessonDetail:
+        normalized_content_language = self._normalize_language(content_language) if content_language else None
+        cache_key = build_cache_key(
+            self._cache_namespace,
+            self._cache_version(),
+            "get_lesson_by_id",
+            lesson_id,
+            normalized_content_language,
+        )
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return LessonDetail.model_validate(cached)
+
         lesson = self._store.get_by_id(lesson_id)
         if lesson is None:
             raise LessonNotFoundError("Lesson not found.")
-        normalized_content_language = self._normalize_language(content_language) if content_language else None
-        return lesson.to_detail(normalized_content_language)
+        detail = lesson.to_detail(normalized_content_language)
+        self._cache_set(cache_key, detail.model_dump(mode="json"))
+        return detail
 
     def list_categories(self, *, published_only: bool = True) -> list[dict[str, int | str]]:
-        return [{"name": category, "lesson_count": count} for category, count in self._store.list_categories(published_only=published_only)]
+        cache_key = build_cache_key(self._cache_namespace, self._cache_version(), "list_categories", published_only)
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return list(cached)
+        categories = [{"name": category, "lesson_count": count} for category, count in self._store.list_categories(published_only=published_only)]
+        self._cache_set(cache_key, categories)
+        return categories
 
     def list_tags(self, *, published_only: bool = True) -> list[dict[str, int | str]]:
         """Return all unique tags with usage counts, sorted by count descending."""
         from collections import Counter
+
+        cache_key = build_cache_key(self._cache_namespace, self._cache_version(), "list_tags", published_only)
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            return list(cached)
+
         lessons = self._store.list_lessons(published_only=published_only)
         counter: Counter[str] = Counter()
         for lesson in lessons:
             for tag in lesson.tags:
                 if tag:
                     counter[tag] += 1
-        return [{"name": tag, "lesson_count": count} for tag, count in counter.most_common()]
+        tags = [{"name": tag, "lesson_count": count} for tag, count in counter.most_common()]
+        self._cache_set(cache_key, tags)
+        return tags
 
     def update_lesson(
         self,
@@ -308,7 +372,7 @@ class LessonService:
             if translations is not None
             else None
         )
-        return self._store.update_lesson(
+        stored = self._store.update_lesson(
             lesson_id=lesson_id,
             title=title.strip() if title is not None else None,
             slug=self._normalize_slug(slug) if slug is not None else None,
@@ -321,9 +385,38 @@ class LessonService:
             translations=normalized_translations,
             published=published,
         )
+        self._invalidate_cache()
+        return stored
 
     def delete_lesson(self, *, lesson_id: str) -> None:
         self._store.delete_lesson(lesson_id)
+        self._invalidate_cache()
+
+    def _cache_version(self) -> int:
+        if self._cache is None:
+            return 0
+        return self._cache.get_version(self._cache_namespace)
+
+    def _cache_get(self, cache_key: str):
+        if self._cache is None:
+            return None
+        cached = self._cache.get(cache_key)
+        if cached is None:
+            return None
+        return json.loads(cached)
+
+    def _cache_set(self, cache_key: str, value: object) -> None:
+        if self._cache is None:
+            return
+        self._cache.set(
+            cache_key,
+            json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str),
+            ttl_seconds=self._cache_ttl,
+        )
+
+    def _invalidate_cache(self) -> None:
+        if self._cache is not None:
+            self._cache.bump_version(self._cache_namespace)
 
     def _normalize_slug(self, value: str) -> str:
         slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")

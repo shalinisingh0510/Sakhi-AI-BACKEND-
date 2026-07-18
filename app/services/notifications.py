@@ -1,16 +1,16 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from threading import RLock
 from typing import Protocol
 from uuid import uuid4
-import json
 
 from app.core.config import Settings
 from app.schemas.notification import NotificationItem, NotificationType
+from app.services.auth import AuthStoreProtocol
+from app.services.email import EmailService
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +73,17 @@ class NotificationStoreProtocol(Protocol):
 
 
 class NotificationService:
-    def __init__(self, settings: Settings, store: NotificationStoreProtocol) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        store: NotificationStoreProtocol,
+        auth_store: AuthStoreProtocol | None = None,
+        email_service: EmailService | None = None,
+    ) -> None:
         self._settings = settings
         self._store = store
+        self._auth_store = auth_store
+        self._email_service = email_service
 
     def create_notification(
         self,
@@ -94,9 +102,27 @@ class NotificationService:
             metadata=metadata or {},
         )
         item = record.to_item()
+        self._send_email_notification(user_id=user_id, item=item)
         # Push real-time update over WebSocket if the user is connected
         self._push_realtime(user_id, item)
         return item
+
+    def _send_email_notification(self, *, user_id: str, item: NotificationItem) -> None:
+        if self._auth_store is None or self._email_service is None:
+            return
+
+        try:
+            user = self._auth_store.get_by_id(user_id)
+            if user is None or not getattr(user, "email", ""):
+                return
+            self._email_service.send_notification(
+                to=user.email,
+                name=user.name,
+                title=item.title,
+                body=item.body,
+            )
+        except Exception as exc:
+            logger.warning("Email notification delivery failed: %s", exc)
 
     def _push_realtime(self, user_id: str, item: NotificationItem) -> None:
         """Fire-and-forget WebSocket push. Never raises."""
@@ -104,13 +130,11 @@ class NotificationService:
             from app.core.websocket_manager import ws_manager  # avoid circular import at module load
 
             payload = {"type": "notification", "data": item.model_dump(mode="json")}
-            # Run in the current event loop if one is running, otherwise skip.
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    asyncio.ensure_future(ws_manager.send_notification(user_id, payload))
+                loop = asyncio.get_running_loop()
             except RuntimeError:
-                pass  # No event loop — sync context (e.g. tests); skip push
+                return
+            loop.create_task(ws_manager.send_notification(user_id, payload))
         except Exception as exc:
             logger.warning("Real-time notification push failed: %s", exc)
 
@@ -171,4 +195,3 @@ class NotificationService:
     def delete_notification(self, *, notification_id: str, user_id: str) -> None:
         """Delete a single notification. Raises NotificationNotFoundError if not found."""
         self._store.delete_notification(notification_id=notification_id, user_id=user_id)
-

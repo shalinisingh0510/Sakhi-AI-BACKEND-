@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Phase 11 complete. 106 tests passing. Backend is production-ready with a comprehensive feature set.**
+**Phase 15 complete. 118 tests passing. Backend is production-ready with a comprehensive feature set.**
 
 ---
 
@@ -72,22 +72,43 @@
 - **`requirements.txt`** created.
 - **GitHub Actions CI/CD**: `.github/workflows/ci.yml` — lint, multi-Python tests (3.11 + 3.12), pip-audit security scan.
 
-### Phase 11 — Auth Security, Notification Management & Developer Experience
-- **Token revocation / logout**: `POST /api/v1/auth/logout` — revokes the current access token by adding its JTI to an in-process `TokenBlacklist`. Subsequent requests with the same token return 401. Memory-bounded (expired entries auto-purged).
+### Phase 11 - Auth Security, Notification Management & Developer Experience
+- **Token revocation / logout**: `POST /api/v1/auth/logout` - revokes the current access token by adding its JTI to an in-process `TokenBlacklist`. Subsequent requests with the same token return 401. Memory-bounded (expired entries auto-purged).
 - **`TokenBlacklist`** class (`app/core/token_blacklist.py`) with `revoke`, `is_revoked`, auto-purge, and `size` property. Global singleton.
 - **`AuthService.logout`** method decodes the token raw (no expiry check) and revokes its JTI.
 - **`AuthService.resolve_current_user`** now checks the blacklist before resolving a user.
-- **Account deletion**: `DELETE /api/v1/auth/me` — permanently removes the authenticated user and all cascade-deleted associated data. Returns 204. Persists across restarts.
+- **Account deletion**: `DELETE /api/v1/auth/me` - permanently removes the authenticated user and all cascade-deleted associated data. Returns 204. Persists across restarts.
 - **`AuthService.delete_user`** + `SQLiteAuthStore.delete_user` + `InMemoryAuthStore.delete_user`.
-- **Mark all notifications as read**: `POST /api/v1/notifications/read-all` — marks every unread notification for the user as read in a single DB call. Returns `{"updated_count": N}`. Idempotent.
-- **Delete notification**: `DELETE /api/v1/notifications/{id}` — permanently removes a single notification from the user's inbox. Ownership enforced (404 if not owner).
+- **Mark all notifications as read**: `POST /api/v1/notifications/read-all` - marks every unread notification for the user as read in a single DB call. Returns `{"updated_count": N}`. Idempotent.
+- **Delete notification**: `DELETE /api/v1/notifications/{id}` - permanently removes a single notification from the user's inbox. Ownership enforced (404 if not owner).
 - **`NotificationService.mark_all_as_read`** and `delete_notification` methods added.
 - **`SQLiteNotificationStore.mark_all_as_read`** and `delete_notification` methods added.
-- **Lesson tag filtering**: `GET /api/v1/lessons?tag=<tag>` — filters lessons by a single tag. Case-insensitive. Combinable with `category`, `language`, and `search`.
+- **Lesson tag filtering**: `GET /api/v1/lessons?tag=<tag>` - filters lessons by a single tag. Case-insensitive. Combinable with `category`, `language`, and `search`.
 - **`LessonService.list_lessons`** extended with `tag` parameter.
 - **Structured access log middleware** (`access_log_middleware`): logs `METHOD PATH STATUS_CODE Xms req_id=XXXX` for every request. Adds `X-Request-Id` header to every response for tracing.
 - **Wired `access_log_middleware`** into `app/main.py`.
-- **New tests**: `test_logout_and_account.py` (10), `test_notifications_extended.py` (9), `test_lessons_extended.py` (8). Total: **106 tests passing**.
+- **New tests**: `test_logout_and_account.py` (10), `test_notifications_extended.py` (9), `test_lessons_extended.py` (8), `test_openapi_export.py` (1), `test_email_notifications.py` (2), `test_redis_token_blacklist.py` (4), `test_cache_backend.py` (3), `test_cached_services.py` (2). Total: **118 tests passing**.
+
+### Phase 12 - API Discoverability
+- Added a versioned OpenAPI export endpoint (`GET /api/v1/openapi.json`) for frontend and integration consumers.
+- Added tests covering schema export and route availability.
+
+### Phase 13 - Email Notifications & Delivery Integration
+- Added best-effort email delivery for notification creation via the existing `EmailService`.
+- Notifications now fan out to email for single-user notifications, admin broadcasts, and lesson-completion events when recipient details are available.
+- Email delivery uses the configured console or SMTP backend and never blocks in-app notification creation.
+- Added focused tests for single-recipient and broadcast email delivery.
+
+### Phase 14 - Redis Token Blacklist
+- Added a Redis-backed token blacklist implementation for multi-node deployments.
+- The app can now build the blacklist backend from settings, with in-memory fallback if Redis is unavailable.
+- Added tests for Redis-backed revocation semantics and backend selection.
+
+### Phase 15 - Redis Caching
+- Added a shared cache backend with in-memory and Redis implementations for versioned, read-through caching.
+- Cached lesson catalog, lesson detail, category, and tag reads with invalidation on lesson mutations.
+- Cached analytics overview and report inputs with invalidation on event tracking.
+- Added tests covering cache backend behavior and service-level cache hits/invalidation.
 
 ---
 
@@ -126,6 +147,7 @@
 - `app/api/v1/endpoints/auth.py`
 - `app/api/v1/endpoints/conversations.py`
 - `app/api/v1/endpoints/health.py`
+- `app/api/v1/endpoints/openapi.py` *(new - Phase 12)*
 - `app/api/v1/endpoints/lessons.py`
 - `app/api/v1/endpoints/notifications.py`
 - `app/api/v1/endpoints/progress.py`
@@ -174,6 +196,11 @@
 - `tests/test_middleware.py`
 - `tests/test_notifications.py`
 - `tests/test_notifications_extended.py` *(new — Phase 11)*
+- `tests/test_openapi_export.py` *(new - Phase 12)*
+- `tests/test_email_notifications.py` *(new - Phase 13)*
+- `tests/test_redis_token_blacklist.py` *(new - Phase 14)*
+- `tests/test_cache_backend.py` *(new - Phase 15)*
+- `tests/test_cached_services.py` *(new - Phase 15)*
 - `tests/test_pagination.py`
 - `tests/test_password_change.py`
 - `tests/test_progress.py`
@@ -187,6 +214,7 @@
 - FastAPI app factory (`create_app`) with full dependency injection via `app.state`.
 - Health check at `/api/v1/health` with SQLite DB probe — returns `database: ok/error/unknown`, `status: ok/degraded`.
 - Structured access logging: every request logs `METHOD PATH STATUS_CODE Xms req_id=XXXX`. `X-Request-Id` header on every response.
+- Versioned OpenAPI export at `/api/v1/openapi.json` for frontend and integration consumers.
 - Environment-driven settings with `SAKHI_` prefix. All key parameters configurable.
 - CORS, rate limiting, request size, and security headers middleware.
 
@@ -220,6 +248,7 @@
 - Mark single as read. **Mark all as read** (new). **Delete single notification** (new).
 - Admin broadcast. Auto lesson-completion notifications.
 - Real-time push via WebSocket when user is connected.
+- Best-effort email delivery for notification creation via the configured `EmailService`.
 
 ### WebSocket (`/api/v1/ws/notifications`)
 - Token auth via query param. Instant push on notification creation.
@@ -231,7 +260,7 @@
 ### Admin Dashboard (`/api/v1/admin`)
 - Overview, combined stats, user management, role updates, lesson CRUD, notification broadcast.
 
-### Automated Tests — 106 total
+### Automated Tests - 118 total
 | File | Tests | Area |
 |------|-------|------|
 | `test_health.py` | 1 | Health endpoint |
@@ -250,11 +279,16 @@
 | `test_password_change.py` | 5 | Change password, wrong password, same, persistence |
 | `test_progress.py` | 1 | Full progress flow with persistence |
 | `test_websocket.py` | 5 | Auth rejection, welcome, pong, manager |
+| `test_openapi_export.py` | 1 | Versioned OpenAPI export |
+| `test_email_notifications.py` | 2 | Email delivery integration |
+| `test_redis_token_blacklist.py` | 4 | Redis blacklist backend |
+| `test_cache_backend.py` | 3 | Cache backend factory and storage |
+| `test_cached_services.py` | 2 | Lesson and analytics cache invalidation |
 
 ### Deployment & CI/CD
 - `DEPLOYMENT.md`: systemd, Docker, Nginx/HTTPS, backup, scaling, 12-point checklist.
 - `requirements.txt` for pip workflows.
-- `pyproject.toml` extras: `[dev]`, `[production]`, `[ai]`.
+- `pyproject.toml` extras: `[dev]`, `[production]`, `[ai]`, `[redis]`.
 - `.github/workflows/ci.yml`: lint → test (3.11 + 3.12) → pip-audit.
 
 ---
@@ -265,6 +299,7 @@
 |--------|------|------|-------------|
 | GET | `/` | None | Root status |
 | GET | `/api/v1/health` | None | Health + DB probe |
+| GET | `/api/v1/openapi.json` | None | Export OpenAPI schema |
 | POST | `/api/v1/auth/register` | None | Register |
 | POST | `/api/v1/auth/login` | None | Login |
 | POST | `/api/v1/auth/refresh` | None | Refresh token |
@@ -320,9 +355,6 @@ All planned and next-step features are complete and tested.
 | Feature | Notes |
 |---------|-------|
 | **PostgreSQL migration** | SQLite is single-writer; swap to Postgres for multi-instance deployments |
-| **Redis token blacklist** | Replace in-process `TokenBlacklist` with Redis SET+TTL for multi-node revocation |
-| **Redis caching** | Cache lesson catalog, analytics aggregates, and rate limit counters |
-| **Email notifications** | SMTP + console fallback for offline push (SendGrid / SES) |
 | **Voice assistant** | Speech-to-text + TTS integration for voice input/output |
 | **Video lessons** | Cloud storage (S3/GCS) for video content with streaming URLs |
 | **Doctor consultation** | Appointment booking, teleconsult, professional profiles |
@@ -331,7 +363,8 @@ All planned and next-step features are complete and tested.
 | **Wearable integration** | Health metric ingestion from device APIs |
 | **SQLite FTS5** | Replace in-memory text search with SQLite full-text search for large catalogs |
 | **Soft delete** | Mark users/lessons deleted rather than hard-removing (for audit trails) |
-| **OpenAPI export** | Swagger/Redoc UI or spec export for frontend teams |
 | **Refresh token rotation** | Issue a new refresh token on each use; revoke the old one |
 | **Admin user search** | Filter/search the user list by name, email, role |
 | **Lesson tags endpoint** | `GET /api/v1/lessons/tags` — list all unique tags with counts |
+
+

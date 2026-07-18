@@ -27,10 +27,14 @@ production = [
 ai = [
   "openai>=1.30,<2.0",
 ]
+redis = [
+  "redis>=5.0,<6.0",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
 

@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from app.core.config import Settings
 from app.core.security import build_token_claims, decode_token, encode_token, hash_password, verify_password
-from app.core.token_blacklist import TokenBlacklist
+from app.core.token_blacklist import TokenBlacklistProtocol, token_blacklist
 from app.schemas.auth import PublicUser, SUPPORTED_LANGUAGES
 
 DEFAULT_PREFERRED_LANGUAGE = "english"
@@ -103,6 +103,7 @@ class AuthStoreProtocol(Protocol):
 
     def delete_user(self, *, user_id: str) -> None:
         ...
+
 
 @dataclass(slots=True)
 class AuthSession:
@@ -234,12 +235,11 @@ class AuthService:
         self,
         settings: Settings,
         store: AuthStoreProtocol | None = None,
-        blacklist: TokenBlacklist | None = None,
+        blacklist: TokenBlacklistProtocol | None = None,
     ) -> None:
         self._settings = settings
         self._store = store or InMemoryAuthStore()
-        from app.core.token_blacklist import token_blacklist as _global_blacklist
-        self._blacklist: TokenBlacklist = blacklist or _global_blacklist
+        self._blacklist: TokenBlacklistProtocol = blacklist or token_blacklist
 
     @property
     def secret_key(self) -> str:
@@ -324,7 +324,6 @@ class AuthService:
         is harmless to revoke.
         """
         try:
-            # Decode without expiry check so expired tokens can still be revoked
             import base64, json as _json
 
             def _b64decode(v: str) -> bytes:
@@ -357,7 +356,6 @@ class AuthService:
         except ValueError as exc:
             raise InvalidTokenError(str(exc)) from exc
 
-        # Check blacklist
         jti = str(claims.get("jti", "")).strip()
         if jti and self._blacklist.is_revoked(jti):
             raise InvalidTokenError("Token has been revoked.")
