@@ -1,5 +1,6 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 
@@ -13,7 +14,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = False
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
-    database_path: Path = Field(default=Path("sakhi_ai.sqlite3"))
+    database_path: Path = Field(default_factory=lambda: Path(tempfile.gettempdir()) / "sakhi_ai.sqlite3")
     # AI provider: "rule-based" (default, no API key needed) or "openai"
     ai_provider_name: str = "rule-based"
     openai_api_key: SecretStr | None = Field(default=None)
@@ -66,12 +67,12 @@ class Settings(BaseSettings):
     @classmethod
     def parse_database_path(cls, value: object) -> Path:
         if value is None:
-            return Path("sakhi_ai.sqlite3")
+            return Path(tempfile.gettempdir()) / "sakhi_ai.sqlite3"
         if isinstance(value, Path):
             return value
         normalized = str(value).strip()
         if not normalized:
-            return Path("sakhi_ai.sqlite3")
+            return Path(tempfile.gettempdir()) / "sakhi_ai.sqlite3"
         return Path(normalized)
 
     @field_validator(
@@ -94,3 +95,4 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
+

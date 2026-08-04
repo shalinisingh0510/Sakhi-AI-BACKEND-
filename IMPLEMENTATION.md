@@ -1,4 +1,4 @@
-﻿# Sakhi AI Backend Implementation Log
+# Sakhi AI Backend Implementation Log
 
 ## Current Status
 
@@ -10,7 +10,7 @@
 
 ## Completed Work
 
-### Phase 1 â€” Foundation
+### Phase 1 — Foundation
 - Created the initial FastAPI project structure.
 - Added centralized app configuration with environment-based settings using `pydantic-settings` with a `SAKHI_` prefix.
 - Added structured logging bootstrap.
@@ -18,7 +18,7 @@
 - Added a root application entry point with CORS support.
 - Added project metadata (`pyproject.toml`) and local development ignore rules.
 
-### Phase 2 â€” Authentication & Authorization
+### Phase 2 — Authentication & Authorization
 - Added password hashing helpers (PBKDF2-SHA256, per-user salts) and signed HMAC-SHA256 token support.
 - Added in-memory user storage with session issuance for register, login, and refresh flows.
 - Added authenticated profile and admin-only routes with role-based authorization checks.
@@ -26,53 +26,53 @@
 - Added profile update support, preferred language storage (10 languages), and admin role management APIs.
 - Added integration tests for registration, login, refresh, profile lookup, persistence across restarts, and role enforcement.
 
-### Phase 3 â€” AI Conversations
+### Phase 3 — AI Conversations
 - Added AI conversation schemas, a SQLite-backed conversation store, safe rule-based reply generation, and authenticated conversation endpoints.
 - Added tests for conversation creation, message exchange, persistence, and private conversation access enforcement.
 
-### Phase 4 â€” Educational Lessons
+### Phase 4 — Educational Lessons
 - Added lesson schemas, a SQLite-backed lesson catalog, seeded educational content (3 default lessons), and public/admin lesson APIs.
 - Added multilingual lesson translations, language-aware retrieval with fallback to the base language.
 - Added full-text search, category filtering, and language filtering on the lesson list endpoint.
 - Added tests for the public lesson catalog, localized content with fallback, admin CRUD, and persistence.
 
-### Phase 5 â€” Progress Tracking
+### Phase 5 — Progress Tracking
 - Added lesson progress schemas, a SQLite-backed progress store, authenticated progress endpoints, and persistence tests.
 - Progress statuses: `not_started`, `in_progress`, `completed` with automatic normalization.
 - Lesson completion triggers an automatic `lesson_completed` notification.
 
-### Phase 6 â€” Notifications
+### Phase 6 — Notifications
 - Added notification schemas, a SQLite-backed notification store, authenticated notification endpoints, and admin broadcast capabilities.
 - Read/unread tracking with `read_at` timestamp; unread count endpoint.
 - Admin can broadcast to all users or target a specific user.
 - Notification types: `announcement`, `lesson_completed`, `reminder`, `system`.
 
-### Phase 7 â€” Analytics
+### Phase 7 — Analytics
 - Added analytics schemas, a SQLite-backed analytics store, event tracking, and user/admin analytics endpoints.
 - 10 supported event types. User engagement metrics, platform overview, event breakdown, daily activity, top users, full analytics report.
 
-### Phase 8 â€” Security Middleware
+### Phase 8 — Security Middleware
 - Added rate limiting (60 req/min per client, configurable), request size limit (10 MB), and comprehensive security headers (HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy).
 - Comprehensive middleware tests (security headers, rate limiting enforcement, per-user identifiers, HSTS, Referrer-Policy, Permissions-Policy).
 
-### Phase 9 â€” Deployment & Production Hardening
+### Phase 9 — Deployment & Production Hardening
 - Added comprehensive `DEPLOYMENT.md` covering systemd, Docker, Nginx/HTTPS, backup strategy, scaling guidance, and a 12-point deployment checklist.
 - Added Gunicorn as an optional `[production]` dependency.
 - Wired all stores, services, and middleware together in the app factory.
 
-### Phase 10 â€” Next-Step Enhancements
+### Phase 10 — Next-Step Enhancements
 - **Pluggable AI provider** (`app/services/ai_providers.py`): `RuleBasedProvider` (default) and `OpenAIProvider` (GPT-4o-mini with conversation history, falls back to rule-based on any error or missing package).
 - **OpenAI settings**: `SAKHI_AI_PROVIDER_NAME`, `SAKHI_OPENAI_API_KEY`, `SAKHI_OPENAI_MODEL`.
 - **`openai>=1.30` optional dependency** (`[ai]` extras).
-- **Password change endpoint**: `POST /api/v1/auth/me/change-password` â€” verifies current password, rejects same-as-current, returns 204.
+- **Password change endpoint**: `POST /api/v1/auth/me/change-password` — verifies current password, rejects same-as-current, returns 204.
 - **Pagination**: `page`/`page_size` on conversations and notifications list endpoints via shared `pagination_params` dependency.
 - **WebSocket real-time notifications**: `wss://.../api/v1/ws/notifications?token=<access_token>` with instant push, heartbeat, and pong.
 - **`WebSocketManager`** singleton with per-user connection tracking and broadcast.
 - **`NotificationService.create_notification`** fire-and-forgets a WebSocket push for any connected user.
 - **Enhanced health check**: probes SQLite connectivity, returns `database` field, status `"degraded"` on DB error.
-- **Admin dashboard stats**: `GET /api/v1/admin/stats` â€” user counts, lesson counts, engagement totals in one request.
+- **Admin dashboard stats**: `GET /api/v1/admin/stats` — user counts, lesson counts, engagement totals in one request.
 - **`requirements.txt`** created.
-- **GitHub Actions CI/CD**: `.github/workflows/ci.yml` â€” lint, multi-Python tests (3.11 + 3.12), pip-audit security scan.
+- **GitHub Actions CI/CD**: `.github/workflows/ci.yml` — lint, multi-Python tests (3.11 + 3.12), pip-audit security scan.
 
 ### Phase 11 - Auth Security, Notification Management & Developer Experience
 - **Token revocation / logout**: `POST /api/v1/auth/logout` - revokes the current access token by adding its JTI to an in-process `TokenBlacklist`. Subsequent requests with the same token return 401. Memory-bounded (expired entries auto-purged).
@@ -129,6 +129,8 @@
 - Fixed real-time notification dispatch so sync FastAPI requests can safely push WebSocket updates.
 - Updated admin platform user counts to exclude soft-deleted accounts.
 - Added regression tests for conversation history, notification push scheduling, and soft-delete-aware stats.
+- Moved the default SQLite fallback database to a writable temp directory and ensured configured database parents are created before startup so create_app() no longer fails in read-only workspace environments.
+- Verified the default health/startup path can boot without manually injecting a database path.
 
 
 
@@ -160,8 +162,8 @@
 - `app/core/logging.py`
 - `app/core/middleware.py`
 - `app/core/security.py`
-- `app/core/token_blacklist.py` *(new â€” Phase 11)*
-- `app/core/websocket_manager.py` *(new â€” Phase 10)*
+- `app/core/token_blacklist.py` *(new — Phase 11)*
+- `app/core/websocket_manager.py` *(new — Phase 10)*
 
 ### API Layer
 - `app/api/__init__.py`
@@ -178,8 +180,8 @@
 - `app/api/v1/endpoints/lessons.py`
 - `app/api/v1/endpoints/notifications.py`
 - `app/api/v1/endpoints/progress.py`
-- `app/api/v1/endpoints/feedback.py` *(new â€” Phase 18)*
-- `app/api/v1/endpoints/ws.py` *(new â€” Phase 10)*
+- `app/api/v1/endpoints/feedback.py` *(new — Phase 18)*
+- `app/api/v1/endpoints/ws.py` *(new — Phase 10)*
 
 ### Database Layer
 - `app/db/__init__.py`
@@ -204,7 +206,7 @@
 ### Services
 - `app/services/__init__.py`
 - `app/services/ai.py`
-- `app/services/ai_providers.py` *(new â€” Phase 10)*
+- `app/services/ai_providers.py` *(new — Phase 10)*
 - `app/services/analytics.py`
 - `app/services/auth.py`
 - `app/services/lessons.py`
@@ -222,11 +224,11 @@
 - `tests/test_conversations.py`
 - `tests/test_health.py`
 - `tests/test_lessons.py`
-- `tests/test_lessons_extended.py` *(new â€” Phase 11)*
-- `tests/test_logout_and_account.py` *(new â€” Phase 11)*
+- `tests/test_lessons_extended.py` *(new — Phase 11)*
+- `tests/test_logout_and_account.py` *(new — Phase 11)*
 - `tests/test_middleware.py`
 - `tests/test_notifications.py`
-- `tests/test_notifications_extended.py` *(new â€” Phase 11)*
+- `tests/test_notifications_extended.py` *(new — Phase 11)*
 - `tests/test_openapi_export.py` *(new - Phase 12)*
 - `tests/test_email_notifications.py` *(new - Phase 13)*
 - `tests/test_redis_token_blacklist.py` *(new - Phase 14)*
@@ -235,7 +237,7 @@
 - `tests/test_pagination.py`
 - `tests/test_password_change.py`
 - `tests/test_progress.py`
-- `tests/test_feedback.py` *(new â€” Phase 18)*
+- `tests/test_feedback.py` *(new — Phase 18)*
 - `tests/test_websocket.py`
 
 ---
@@ -244,7 +246,7 @@
 
 ### Application Foundation
 - FastAPI app factory (`create_app`) with full dependency injection via `app.state`.
-- Health check at `/api/v1/health` with SQLite DB probe â€” returns `database: ok/error/unknown`, `status: ok/degraded`.
+- Health check at `/api/v1/health` with SQLite DB probe — returns `database: ok/error/unknown`, `status: ok/degraded`.
 - Structured access logging: every request logs `METHOD PATH STATUS_CODE Xms req_id=XXXX`. `X-Request-Id` header on every response.
 - Versioned OpenAPI export at `/api/v1/openapi.json` for frontend and integration consumers.
 - Environment-driven settings with `SAKHI_` prefix. All key parameters configurable.
@@ -329,7 +331,7 @@
 - `DEPLOYMENT.md`: systemd, Docker, Nginx/HTTPS, backup, scaling, 12-point checklist.
 - `requirements.txt` for pip workflows.
 - `pyproject.toml` extras: `[dev]`, `[production]`, `[ai]`, `[redis]`.
-- `.github/workflows/ci.yml`: lint â†’ test (3.11 + 3.12) â†’ pip-audit.
+- `.github/workflows/ci.yml`: lint → test (3.11 + 3.12) → pip-audit.
 
 ---
 
@@ -364,7 +366,7 @@
 | POST | `/api/v1/notifications/read-all` | User | **Mark all as read** |
 | PATCH | `/api/v1/notifications/{id}/read` | User | Mark one as read |
 | DELETE | `/api/v1/notifications/{id}` | User | **Delete notification** |
-| WS | `/api/v1/ws/notifications?token=â€¦` | User | Real-time push |
+| WS | `/api/v1/ws/notifications?token=…` | User | Real-time push |
 | POST | `/api/v1/analytics/events` | User | Track event |
 | GET | `/api/v1/analytics/events` | User | List user events |
 | GET | `/api/v1/analytics/engagement` | User | Engagement metrics |
@@ -407,6 +409,7 @@ The remaining work is the future enhancement backlog below.
 | **Personalized learning paths** | Recommendation engine based on progress, preferences, engagement |
 | **Community features** | Moderated discussion boards or peer support groups |
 | **Wearable integration** | Health metric ingestion from device APIs |
+
 
 
 

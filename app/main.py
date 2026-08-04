@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,6 +41,7 @@ def create_app(
     auth_store: AuthStoreProtocol | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
+    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
 
     app = FastAPI(
         title=settings.app_name,
@@ -129,3 +130,6 @@ def create_app(
 
 
 app = create_app()
+
+
+
