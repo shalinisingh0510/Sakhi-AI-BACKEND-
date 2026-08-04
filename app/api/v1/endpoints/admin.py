@@ -1,19 +1,23 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.dependencies import (
     get_analytics_service,
     get_auth_service,
+    get_feedback_service,
     get_lesson_service,
     get_notification_service,
+    pagination_params,
     require_roles,
 )
 from app.schemas.auth import PublicUser, UpdateRoleRequest
+from app.schemas.feedback import FeedbackItem, FeedbackOverview, UpdateFeedbackStatusRequest
 from app.schemas.lesson import CreateLessonRequest, LessonDetail, LessonSummary, UpdateLessonRequest
 from app.schemas.notification import CreateNotificationRequest, NotificationDispatchResult
 from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService, InvalidRoleError, StoredUser, UserNotFoundError
+from app.services.feedback import FeedbackNotFoundError, FeedbackService, InvalidFeedbackError
 from app.services.lessons import DuplicateLessonSlugError, InvalidLessonContentError, LessonNotFoundError, LessonService
 from app.services.notifications import NotificationService
 
@@ -34,10 +38,12 @@ def admin_stats(
     _current_user: StoredUser = Depends(require_roles("admin")),
     auth_service: AuthService = Depends(get_auth_service),
     analytics_service: AnalyticsService = Depends(get_analytics_service),
+    feedback_service: FeedbackService = Depends(get_feedback_service),
     lesson_service: LessonService = Depends(get_lesson_service),
 ) -> dict:
-    """Combined admin dashboard stats — single request covers users, content, and activity."""
+    """Combined admin dashboard stats â€” single request covers users, content, activity, and feedback."""
     platform = analytics_service.get_platform_overview()
+    feedback = feedback_service.get_overview()
     lessons = lesson_service.list_lessons(published_only=False)
     published_count = sum(1 for l in lessons if l.published)
     unpublished_count = len(lessons) - published_count
@@ -55,6 +61,7 @@ def admin_stats(
             "unpublished": unpublished_count,
             "categories": len(categories),
         },
+        "feedback": feedback.model_dump(),
         "engagement": {
             "total_events": platform.total_events,
             "total_lesson_views": platform.total_lesson_views,
@@ -117,6 +124,40 @@ def create_notification(
         metadata=payload.metadata,
     )
     return NotificationDispatchResult(created_count=len(notifications), notifications=notifications)
+
+
+@router.get("/feedback", response_model=list[FeedbackItem])
+def list_feedback(
+    pagination: tuple[int, int] = Depends(pagination_params),
+    feedback_status: str | None = Query(default=None, description="Filter by feedback status"),
+    category: str | None = Query(default=None, description="Filter by feedback category"),
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    feedback_service: FeedbackService = Depends(get_feedback_service),
+) -> list[FeedbackItem]:
+    offset, limit = pagination
+    try:
+        return feedback_service.list_feedback(status=feedback_status, category=category, limit=limit, offset=offset)
+    except InvalidFeedbackError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.patch("/feedback/{feedback_id}/status", response_model=FeedbackItem)
+def update_feedback_status(
+    feedback_id: str,
+    payload: UpdateFeedbackStatusRequest,
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    feedback_service: FeedbackService = Depends(get_feedback_service),
+) -> FeedbackItem:
+    try:
+        return feedback_service.update_feedback_status(
+            feedback_id=feedback_id,
+            status=payload.status,
+            admin_notes=payload.admin_notes,
+        )
+    except FeedbackNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except InvalidFeedbackError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/lessons", response_model=list[LessonSummary])
@@ -215,3 +256,4 @@ def delete_lesson(
         lesson_service.delete_lesson(lesson_id=lesson_id)
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+

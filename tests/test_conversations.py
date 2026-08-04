@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -106,3 +106,61 @@ def test_conversation_is_private_to_owner(tmp_path: Path) -> None:
         headers={"Authorization": f"Bearer {other_token}"},
     )
     assert forbidden_response.status_code == 404
+
+
+def test_follow_up_message_uses_history_without_duplication(tmp_path: Path) -> None:
+    database_path = tmp_path / "conversations-history.sqlite3"
+    client = build_client(database_path)
+
+    register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
+    assert register_response.status_code == 201
+    access_token = register_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    class CaptureProvider:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+
+        def generate_reply(
+            self,
+            *,
+            user_message: str,
+            conversation_title: str,
+            preferred_language: str,
+            history: list[dict[str, str]],
+        ) -> str:
+            self.calls.append(
+                {
+                    "user_message": user_message,
+                    "conversation_title": conversation_title,
+                    "preferred_language": preferred_language,
+                    "history": [dict(message) for message in history],
+                }
+            )
+            return f"captured reply {len(self.calls)}"
+
+    provider = CaptureProvider()
+    client.app.state.ai_service._provider = provider
+
+    create_response = client.post(
+        "/api/v1/conversations",
+        json={"initial_message": "Tell me about menstrual health"},
+        headers=headers,
+    )
+    assert create_response.status_code == 201
+    conversation_id = create_response.json()["conversation"]["id"]
+
+    follow_response = client.post(
+        f"/api/v1/conversations/{conversation_id}/messages",
+        json={"message": "Can hydration help with cramps?"},
+        headers=headers,
+    )
+    assert follow_response.status_code == 200
+    assert len(provider.calls) == 2
+
+    follow_up_call = provider.calls[1]
+    assert follow_up_call["user_message"] == "Can hydration help with cramps?"
+    history = follow_up_call["history"]
+    assert len(history) == 2
+    assert [message["role"] for message in history] == ["user", "assistant"]
+    assert history[-1]["content"] != "Can hydration help with cramps?"

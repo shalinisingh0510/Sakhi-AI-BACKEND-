@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -141,7 +141,7 @@ class AIService:
         conversation = self._require_owned_conversation(user_id=user_id, conversation_id=conversation_id)
         self._store.add_message(conversation_id=conversation.id, role="user", content=message)
         # Build recent history for context-aware replies (respects history limit)
-        history = self._build_history(conversation_id=conversation.id, exclude_last_n=0)
+        history = self._build_history(conversation_id=conversation.id, exclude_last_n=1)
         reply_text = self._provider.generate_reply(
             user_message=message,
             conversation_title=conversation.title,
@@ -189,3 +189,4 @@ class AIService:
         limit = self._settings.conversation_history_limit
         recent = messages[-limit:] if len(messages) > limit else messages
         return [{"role": msg.role, "content": msg.content} for msg in recent]
+

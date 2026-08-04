@@ -163,7 +163,9 @@ class SQLiteAnalyticsStore:
 
     def get_platform_overview(self) -> dict[str, int]:
         with self._lock:
-            total_users_row = self._connection.execute("SELECT COUNT(*) AS count FROM users").fetchone()
+            total_users_row = self._connection.execute(
+                "SELECT COUNT(*) AS count FROM users WHERE is_deleted = 0"
+            ).fetchone()
             total_users = int(total_users_row["count"])
 
             total_events_row = self._connection.execute("SELECT COUNT(*) AS count FROM analytics_events").fetchone()
@@ -297,3 +299,4 @@ class SQLiteAnalyticsStore:
             })
 
         return top_users
+

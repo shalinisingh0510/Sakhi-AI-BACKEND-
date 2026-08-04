@@ -157,3 +157,18 @@ def test_admin_stats_requires_authentication(tmp_path: Path) -> None:
     client = build_client(tmp_path / "stats-unauth.sqlite3")
     resp = client.get("/api/v1/admin/stats")
     assert resp.status_code == 401
+
+
+def test_admin_stats_excludes_soft_deleted_users(tmp_path: Path) -> None:
+    client = build_client(tmp_path / "stats-soft-delete.sqlite3")
+    admin_token = _register_and_token(client, REGISTER_ADMIN)
+    user_token = _register_and_token(client, REGISTER_USER)
+    user_headers = {"Authorization": f"Bearer {user_token}"}
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    delete_response = client.delete("/api/v1/auth/me", headers=user_headers)
+    assert delete_response.status_code == 204
+
+    resp = client.get("/api/v1/admin/stats", headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.json()["users"]["total"] == 1

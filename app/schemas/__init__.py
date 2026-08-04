@@ -1,4 +1,4 @@
-from .ai import ConversationDetail, ConversationMessage, ConversationSummary, CreateConversationRequest, SendMessageRequest
+﻿from .ai import ConversationDetail, ConversationMessage, ConversationSummary, CreateConversationRequest, SendMessageRequest
 from .analytics import (
     AnalyticsEvent,
     AnalyticsReport,
@@ -18,6 +18,7 @@ from .auth import (
     UpdateProfileRequest,
     UpdateRoleRequest,
 )
+from .feedback import FeedbackCategory, FeedbackItem, FeedbackOverview, FeedbackStatus, SubmitFeedbackRequest, UpdateFeedbackStatusRequest
 from .lesson import CreateLessonRequest, LessonDetail, LessonSection, LessonSummary, LessonTranslationRequest, UpdateLessonRequest
 from .notification import (
     CreateNotificationRequest,
@@ -42,6 +43,10 @@ __all__ = [
     "DailyActivity",
     "EventBreakdown",
     "EventType",
+    "FeedbackCategory",
+    "FeedbackItem",
+    "FeedbackOverview",
+    "FeedbackStatus",
     "LessonDetail",
     "LessonProgressItem",
     "LessonSection",
@@ -57,7 +62,9 @@ __all__ = [
     "RefreshRequest",
     "RegisterRequest",
     "SendMessageRequest",
+    "SubmitFeedbackRequest",
     "UnreadCountResponse",
+    "UpdateFeedbackStatusRequest",
     "UpdateLessonRequest",
     "UpdateProgressRequest",
     "UpdateProfileRequest",

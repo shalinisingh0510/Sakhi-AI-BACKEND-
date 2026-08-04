@@ -1,4 +1,4 @@
-from .ai import (
+﻿from .ai import (
     AIService,
     ConversationAccessDeniedError,
     ConversationError,
@@ -21,6 +21,15 @@ from .auth import (
     InvalidTokenError,
     StoredUser,
     UserNotFoundError,
+)
+from .feedback import (
+    FeedbackError,
+    FeedbackNotFoundError,
+    FeedbackOverview,
+    FeedbackService,
+    FeedbackStoreProtocol,
+    InvalidFeedbackError,
+    StoredFeedback,
 )
 from .lessons import (
     DuplicateLessonSlugError,
@@ -66,10 +75,16 @@ __all__ = [
     "DEFAULT_PROGRESS_PERCENT",
     "DuplicateEmailError",
     "DuplicateLessonSlugError",
+    "FeedbackError",
+    "FeedbackNotFoundError",
+    "FeedbackOverview",
+    "FeedbackService",
+    "FeedbackStoreProtocol",
     "InMemoryAuthStore",
     "IN_PROGRESS_DEFAULT_PERCENT",
     "InvalidConversationMessageError",
     "InvalidCredentialsError",
+    "InvalidFeedbackError",
     "InvalidLessonContentError",
     "InvalidNotificationError",
     "InvalidProfileUpdateError",
@@ -91,6 +106,7 @@ __all__ = [
     "ProgressStoreProtocol",
     "StoredConversation",
     "StoredConversationMessage",
+    "StoredFeedback",
     "StoredLesson",
     "StoredLessonProgress",
     "StoredNotification",

@@ -1,6 +1,7 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
+import anyio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -125,11 +126,18 @@ class NotificationService:
             logger.warning("Email notification delivery failed: %s", exc)
 
     def _push_realtime(self, user_id: str, item: NotificationItem) -> None:
-        """Fire-and-forget WebSocket push. Never raises."""
+        """Deliver a WebSocket push from sync or async contexts."""
         try:
             from app.core.websocket_manager import ws_manager  # avoid circular import at module load
 
             payload = {"type": "notification", "data": item.model_dump(mode="json")}
+
+            try:
+                anyio.from_thread.run(ws_manager.send_notification, user_id, payload)
+                return
+            except RuntimeError:
+                pass
+
             try:
                 loop = asyncio.get_running_loop()
             except RuntimeError:
@@ -195,3 +203,4 @@ class NotificationService:
     def delete_notification(self, *, notification_id: str, user_id: str) -> None:
         """Delete a single notification. Raises NotificationNotFoundError if not found."""
         self._store.delete_notification(notification_id=notification_id, user_id=user_id)
+

@@ -197,3 +197,32 @@ def test_delete_notification_requires_authentication(tmp_path: Path) -> None:
     client = build_client(tmp_path / "delete-unauth.sqlite3")
     resp = client.delete("/api/v1/notifications/some-id")
     assert resp.status_code == 401
+
+
+def test_create_notification_uses_realtime_push_path(tmp_path: Path, monkeypatch) -> None:
+    client = build_client(tmp_path / "realtime-push.sqlite3")
+    user_token, admin_token, user_id = _setup(client)
+
+    captured: dict[str, object] = {}
+
+    def fake_run(func, *args):
+        captured["func"] = func
+        captured["args"] = args
+        return None
+
+    monkeypatch.setattr("app.services.notifications.anyio.from_thread.run", fake_run)
+
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    response = client.post(
+        "/api/v1/admin/notifications",
+        json={
+            "recipient_user_id": user_id,
+            "title": "Live update",
+            "body": "You have a new notification.",
+            "notification_type": "announcement",
+        },
+        headers=admin_headers,
+    )
+    assert response.status_code == 201
+    assert captured["func"].__name__ == "send_notification"
+    assert captured["args"][0] == user_id

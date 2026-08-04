@@ -15,11 +15,20 @@ from app.core.middleware import (
     security_headers_middleware,
 )
 from app.core.token_blacklist import build_token_blacklist
-from app.db import SQLiteAuthStore, SQLiteAnalyticsStore, SQLiteConversationStore, SQLiteLessonStore, SQLiteNotificationStore, SQLiteProgressStore
+from app.db import (
+    SQLiteAnalyticsStore,
+    SQLiteAuthStore,
+    SQLiteConversationStore,
+    SQLiteFeedbackStore,
+    SQLiteLessonStore,
+    SQLiteNotificationStore,
+    SQLiteProgressStore,
+)
 from app.services.ai import AIService
 from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService, AuthStoreProtocol
 from app.services.email import EmailService, build_email_backend
+from app.services.feedback import FeedbackService
 from app.services.lessons import LessonService
 from app.services.notifications import NotificationService
 from app.services.progress import ProgressService
@@ -60,6 +69,8 @@ def create_app(
     app.state.ai_service = AIService(settings, store=app.state.ai_store)
     app.state.lesson_store = SQLiteLessonStore(settings.database_path)
     app.state.lesson_service = LessonService(settings, store=app.state.lesson_store, cache=cache_backend)
+    app.state.feedback_store = SQLiteFeedbackStore(settings.database_path)
+    app.state.feedback_service = FeedbackService(settings, store=app.state.feedback_store)
 
     # Email service
     email_backend = build_email_backend(

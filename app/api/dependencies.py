@@ -1,10 +1,11 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from fastapi import Depends, Header, HTTPException, Query, Request, status
 
 from app.services.ai import AIService
 from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService, InvalidTokenError, StoredUser
+from app.services.feedback import FeedbackService
 from app.services.lessons import LessonService
 from app.services.notifications import NotificationService
 from app.services.progress import ProgressService
@@ -24,6 +25,10 @@ def get_lesson_service(request: Request) -> LessonService:
 
 def get_notification_service(request: Request) -> NotificationService:
     return request.app.state.notification_service
+
+
+def get_feedback_service(request: Request) -> FeedbackService:
+    return request.app.state.feedback_service
 
 
 def get_progress_service(request: Request) -> ProgressService:
