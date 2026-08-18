@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -34,102 +36,108 @@ from app.services.notifications import NotificationService
 from app.services.progress import ProgressService
 
 configure_logging()
+startup_logger = logging.getLogger("sakhi.startup")
 
 
 def create_app(
     settings: Settings | None = None,
     auth_store: AuthStoreProtocol | None = None,
 ) -> FastAPI:
-    settings = settings or get_settings()
-    settings.database_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        settings = settings or get_settings()
+        settings.database_path.parent.mkdir(parents=True, exist_ok=True)
 
-    app = FastAPI(
-        title=settings.app_name,
-        version=settings.app_version,
-        debug=settings.debug,
-    )
+        app = FastAPI(
+            title=settings.app_name,
+            version=settings.app_version,
+            debug=settings.debug,
+        )
 
-    app.state.settings = settings
-    app.state.auth_store = auth_store or SQLiteAuthStore(settings.database_path)
+        app.state.settings = settings
+        app.state.auth_store = auth_store or SQLiteAuthStore(settings.database_path)
 
-    cache_backend = build_cache_backend(
-        backend=settings.cache_backend,
-        redis_url=settings.redis_url,
-        redis_key_prefix=settings.redis_cache_prefix,
-    )
-    app.state.cache_backend = cache_backend
+        cache_backend = build_cache_backend(
+            backend=settings.cache_backend,
+            redis_url=settings.redis_url,
+            redis_key_prefix=settings.redis_cache_prefix,
+        )
+        app.state.cache_backend = cache_backend
 
-    token_blacklist = build_token_blacklist(
-        backend=settings.token_blacklist_backend,
-        redis_url=settings.redis_url,
-        redis_key_prefix=settings.redis_token_blacklist_prefix,
-    )
-    app.state.token_blacklist = token_blacklist
-    app.state.auth_service = AuthService(settings, store=app.state.auth_store, blacklist=token_blacklist)
-    app.state.ai_store = SQLiteConversationStore(settings.database_path)
-    app.state.ai_service = AIService(settings, store=app.state.ai_store)
-    app.state.lesson_store = SQLiteLessonStore(settings.database_path)
-    app.state.lesson_service = LessonService(settings, store=app.state.lesson_store, cache=cache_backend)
-    app.state.feedback_store = SQLiteFeedbackStore(settings.database_path)
-    app.state.feedback_service = FeedbackService(settings, store=app.state.feedback_store)
+        token_blacklist = build_token_blacklist(
+            backend=settings.token_blacklist_backend,
+            redis_url=settings.redis_url,
+            redis_key_prefix=settings.redis_token_blacklist_prefix,
+        )
+        app.state.token_blacklist = token_blacklist
+        app.state.auth_service = AuthService(settings, store=app.state.auth_store, blacklist=token_blacklist)
+        app.state.ai_store = SQLiteConversationStore(settings.database_path)
+        app.state.ai_service = AIService(settings, store=app.state.ai_store)
+        app.state.lesson_store = SQLiteLessonStore(settings.database_path)
+        app.state.lesson_service = LessonService(settings, store=app.state.lesson_store, cache=cache_backend)
+        app.state.feedback_store = SQLiteFeedbackStore(settings.database_path)
+        app.state.feedback_service = FeedbackService(settings, store=app.state.feedback_store)
 
-    # Email service
-    email_backend = build_email_backend(
-        settings.email_backend,
-        host=settings.email_host,
-        port=settings.email_port,
-        username=settings.email_username,
-        password=settings.email_password.get_secret_value(),
-        sender=settings.email_from,
-        use_tls=settings.email_use_tls,
-    )
-    app.state.email_service = EmailService(backend=email_backend)
+        # Email service
+        email_backend = build_email_backend(
+            settings.email_backend,
+            host=settings.email_host,
+            port=settings.email_port,
+            username=settings.email_username,
+            password=settings.email_password.get_secret_value(),
+            sender=settings.email_from,
+            use_tls=settings.email_use_tls,
+        )
+        app.state.email_service = EmailService(backend=email_backend)
 
-    app.state.notification_store = SQLiteNotificationStore(settings.database_path)
-    app.state.notification_service = NotificationService(
-        settings,
-        store=app.state.notification_store,
-        auth_store=app.state.auth_store,
-        email_service=app.state.email_service,
-    )
-    app.state.progress_store = SQLiteProgressStore(settings.database_path)
-    app.state.progress_service = ProgressService(
-        settings,
-        store=app.state.progress_store,
-        lesson_service=app.state.lesson_service,
-        notification_service=app.state.notification_service,
-    )
-    app.state.analytics_store = SQLiteAnalyticsStore(settings.database_path)
-    app.state.analytics_service = AnalyticsService(settings, store=app.state.analytics_store, cache=cache_backend)
+        app.state.notification_store = SQLiteNotificationStore(settings.database_path)
+        app.state.notification_service = NotificationService(
+            settings,
+            store=app.state.notification_store,
+            auth_store=app.state.auth_store,
+            email_service=app.state.email_service,
+        )
+        app.state.progress_store = SQLiteProgressStore(settings.database_path)
+        app.state.progress_service = ProgressService(
+            settings,
+            store=app.state.progress_store,
+            lesson_service=app.state.lesson_service,
+            notification_service=app.state.notification_service,
+        )
+        app.state.analytics_store = SQLiteAnalyticsStore(settings.database_path)
+        app.state.analytics_service = AnalyticsService(settings, store=app.state.analytics_store, cache=cache_backend)
 
-    configure_rate_limiter(settings.rate_limit_requests_per_minute)
+        configure_rate_limiter(settings.rate_limit_requests_per_minute)
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
-    app.middleware("http")(security_headers_middleware)
-    app.middleware("http")(request_size_middleware)
-    app.middleware("http")(rate_limit_middleware)
-    app.middleware("http")(access_log_middleware)
+        app.middleware("http")(security_headers_middleware)
+        app.middleware("http")(request_size_middleware)
+        app.middleware("http")(rate_limit_middleware)
+        app.middleware("http")(access_log_middleware)
 
-    app.include_router(api_router)
+        app.include_router(api_router)
 
-    @app.get("/", include_in_schema=False)
-    def root() -> dict[str, str]:
-        return {
-            "message": "Sakhi AI API is running",
-            "status": "ok",
-        }
+        @app.get("/api/health", include_in_schema=False)
+        def lightweight_health_check() -> dict[str, str]:
+            return {"status": "ok"}
 
-    return app
+        @app.get("/", include_in_schema=False)
+        def root() -> dict[str, str]:
+            return {
+                "message": "Sakhi AI API is running",
+                "status": "ok",
+            }
+
+        return app
+    except Exception as exc:
+        startup_logger.exception("Failed to initialize Sakhi AI backend services.")
+        raise RuntimeError("Sakhi AI backend failed to start during initialization.") from exc
 
 
 app = create_app()
-
-
-

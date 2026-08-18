@@ -95,8 +95,10 @@ chmod 700 /var/lib/sakhi-ai
 ### Development Mode
 
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m app
 ```
+
+The app entrypoint reads the `PORT` environment variable and falls back to `5000` when one is not provided.
 
 ### Production Mode with Gunicorn
 
@@ -236,18 +238,18 @@ Logs are written to:
 Monitor the health endpoint:
 
 ```bash
-curl https://your-domain.com/api/v1/health
+curl https://your-domain.com/api/health
 ```
 
 Expected response:
 
 ```json
 {
-    "status": "ok",
-    "service": "Sakhi AI API",
-    "version": "0.1.0"
+    "status": "ok"
 }
 ```
+
+For a richer runtime check that includes database status, use `/api/v1/health`.
 
 ## Backup Strategy
 
@@ -346,3 +348,6 @@ For issues or questions:
 - Check logs: `/var/log/sakhi-ai/error.log`
 - Review this documentation
 - Check GitHub issues
+
+
+

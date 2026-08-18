@@ -4,7 +4,7 @@ import tempfile
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,14 +13,25 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     environment: str = "development"
     debug: bool = False
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    cors_origins: list[str] = Field(
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "https://sakhi-ai-frontend-delta.vercel.app",
+        ]
+    )
     database_path: Path = Field(default_factory=lambda: Path(tempfile.gettempdir()) / "sakhi_ai.sqlite3")
     # AI provider: "rule-based" (default, no API key needed) or "openai"
     ai_provider_name: str = "rule-based"
     openai_api_key: SecretStr | None = Field(default=None)
     openai_model: str = "gpt-4o-mini"
     conversation_history_limit: int = 8
-    secret_key: SecretStr = Field(default=SecretStr("dev-secret-change-me"))
+    secret_key: SecretStr = Field(
+        default=SecretStr("dev-secret-change-me"),
+        validation_alias=AliasChoices("JWT_SECRET", "SAKHI_SECRET_KEY"),
+    )
     access_token_minutes: int = 60
     refresh_token_days: int = 7
     rate_limit_requests_per_minute: int = 60
@@ -90,6 +101,35 @@ class Settings(BaseSettings):
         if parsed_value <= 0:
             raise ValueError("Numeric settings must be positive.")
         return parsed_value
+
+    @model_validator(mode="after")
+    def validate_runtime_settings(self) -> "Settings":
+        normalized_environment = self.environment.strip().lower()
+        normalized_provider = self.ai_provider_name.strip().lower()
+        normalized_blacklist_backend = self.token_blacklist_backend.strip().lower()
+        normalized_cache_backend = self.cache_backend.strip().lower()
+
+        if normalized_environment in {"production", "staging"}:
+            secret_key_value = self.secret_key.get_secret_value().strip()
+            if not secret_key_value or secret_key_value == "dev-secret-change-me":
+                raise ValueError(
+                    "SAKHI_SECRET_KEY or JWT_SECRET must be configured before starting in production."
+                )
+
+        if (
+            normalized_environment in {"production", "staging"}
+            and normalized_provider == "openai"
+            and self.openai_api_key is None
+        ):
+            raise ValueError("OPENAI_API_KEY must be configured when SAKHI_AI_PROVIDER_NAME is openai.")
+
+        if normalized_blacklist_backend not in {"memory", "redis"}:
+            raise ValueError("SAKHI_TOKEN_BLACKLIST_BACKEND must be either 'memory' or 'redis'.")
+
+        if normalized_cache_backend not in {"memory", "redis"}:
+            raise ValueError("SAKHI_CACHE_BACKEND must be either 'memory' or 'redis'.")
+
+        return self
 
 
 @lru_cache(maxsize=1)

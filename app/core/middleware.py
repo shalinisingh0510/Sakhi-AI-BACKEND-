@@ -88,7 +88,7 @@ async def rate_limit_middleware(request: Request, call_next: Callable) -> JSONRe
     identifier = get_client_identifier(request)
     
     # Skip rate limiting for health endpoint
-    if request.url.path == "/" or request.url.path == "/api/v1/health":
+    if request.url.path in {"/", "/api/health", "/api/v1/health"}:
         return await call_next(request)
     
     if not _rate_limiter.is_allowed(identifier):
