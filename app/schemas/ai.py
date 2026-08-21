@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
@@ -39,6 +39,7 @@ class CreateConversationRequest(BaseModel):
     title: str | None = Field(default=None, max_length=120)
     initial_message: str = Field(min_length=1, max_length=4000)
     preferred_language: str | None = Field(default=None, max_length=32)
+    mode: Literal["text", "voice"] = "text"
 
     @field_validator("title")
     @classmethod
@@ -73,6 +74,7 @@ class CreateConversationRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
+    mode: Literal["text", "voice"] = "text"
 
     @field_validator("message")
     @classmethod
