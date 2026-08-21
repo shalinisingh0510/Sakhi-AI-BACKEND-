@@ -23,9 +23,11 @@ class Settings(BaseSettings):
         ]
     )
     database_path: Path = Field(default_factory=lambda: Path(tempfile.gettempdir()) / "sakhi_ai.sqlite3")
-    # AI provider: "rule-based" (default, no API key needed) or "openai"
-    ai_provider_name: str = "rule-based"
+    # AI provider: "rule-based" (default, no API key needed), "openai", "gemini", or "groq"
+    ai_provider_name: str = "gemini"
     openai_api_key: SecretStr | None = Field(default=None)
+    gemini_api_key: SecretStr | None = Field(default=None)
+    groq_api_key: SecretStr | None = Field(default=None)
     openai_model: str = "gpt-4o-mini"
     conversation_history_limit: int = 8
     secret_key: SecretStr = Field(
@@ -121,7 +123,21 @@ class Settings(BaseSettings):
             and normalized_provider == "openai"
             and self.openai_api_key is None
         ):
-            raise ValueError("OPENAI_API_KEY must be configured when SAKHI_AI_PROVIDER_NAME is openai.")
+            raise ValueError("SAKHI_OPENAI_API_KEY must be configured when SAKHI_AI_PROVIDER_NAME is openai.")
+            
+        if (
+            normalized_environment in {"production", "staging"}
+            and normalized_provider == "gemini"
+            and self.gemini_api_key is None
+        ):
+            raise ValueError("SAKHI_GEMINI_API_KEY must be configured when SAKHI_AI_PROVIDER_NAME is gemini.")
+            
+        if (
+            normalized_environment in {"production", "staging"}
+            and normalized_provider == "groq"
+            and self.groq_api_key is None
+        ):
+            raise ValueError("SAKHI_GROQ_API_KEY must be configured when SAKHI_AI_PROVIDER_NAME is groq.")
 
         if normalized_blacklist_backend not in {"memory", "redis"}:
             raise ValueError("SAKHI_TOKEN_BLACKLIST_BACKEND must be either 'memory' or 'redis'.")

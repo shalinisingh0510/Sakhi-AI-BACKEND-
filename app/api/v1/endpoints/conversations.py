@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -32,6 +32,7 @@ def create_conversation(
         title=payload.title,
         initial_message=payload.initial_message,
         preferred_language=payload.preferred_language,
+        mode=payload.mode,
     )
 
 
@@ -55,6 +56,6 @@ def send_message(
     ai_service: AIService = Depends(get_ai_service),
 ) -> ConversationDetail:
     try:
-        return ai_service.send_message(user_id=current_user.id, conversation_id=conversation_id, message=payload.message)
+        return ai_service.send_message(user_id=current_user.id, conversation_id=conversation_id, message=payload.message, mode=payload.mode)
     except ConversationNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
