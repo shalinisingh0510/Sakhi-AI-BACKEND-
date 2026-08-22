@@ -22,7 +22,13 @@ class Settings(BaseSettings):
             "https://sakhi-ai-frontend-delta.vercel.app",
         ]
     )
-    database_path: Path = Field(default_factory=lambda: Path(tempfile.gettempdir()) / "sakhi_ai.sqlite3")
+    database_url: str = "postgresql://postgres:postgres@localhost:5432/sakhi"
+    
+    # Cloudflare R2 Storage (Placeholder for future media storage)
+    cloudflare_r2_endpoint_url: str | None = None
+    cloudflare_r2_access_key_id: str | None = None
+    cloudflare_r2_secret_access_key: SecretStr | None = None
+    cloudflare_r2_bucket_name: str | None = None
     # AI provider: "rule-based" (default, no API key needed), "openai", "gemini", or "groq"
     ai_provider_name: str = "gemini"
     openai_api_key: SecretStr | None = Field(default=None)
@@ -76,17 +82,7 @@ class Settings(BaseSettings):
             return [str(origin).strip() for origin in value if str(origin).strip()]
         return ["http://localhost:3000"]
 
-    @field_validator("database_path", mode="before")
-    @classmethod
-    def parse_database_path(cls, value: object) -> Path:
-        if value is None:
-            return Path(tempfile.gettempdir()) / "sakhi_ai.sqlite3"
-        if isinstance(value, Path):
-            return value
-        normalized = str(value).strip()
-        if not normalized:
-            return Path(tempfile.gettempdir()) / "sakhi_ai.sqlite3"
-        return Path(normalized)
+
 
     @field_validator(
         "access_token_minutes",

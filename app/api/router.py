@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter
+from fastapi import APIRouter
 
 from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.analytics import router as analytics_router
@@ -10,6 +10,7 @@ from app.api.v1.endpoints.lessons import router as lessons_router
 from app.api.v1.endpoints.notifications import router as notifications_router
 from app.api.v1.endpoints.openapi import router as openapi_router
 from app.api.v1.endpoints.progress import router as progress_router
+from app.api.v1.endpoints.media import router as media_router
 from app.api.v1.endpoints.ws import router as ws_router
 
 api_router = APIRouter()
@@ -23,4 +24,5 @@ api_router.include_router(progress_router, prefix="/api/v1")
 api_router.include_router(notifications_router, prefix="/api/v1")
 api_router.include_router(analytics_router, prefix="/api/v1")
 api_router.include_router(admin_router, prefix="/api/v1")
+api_router.include_router(media_router, prefix="/api/v1")
 api_router.include_router(ws_router, prefix="/api/v1")
