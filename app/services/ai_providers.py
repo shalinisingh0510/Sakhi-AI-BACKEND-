@@ -154,7 +154,7 @@ class OpenAIProvider:
         mode: str = "text",
     ) -> str:
         if self._client is None:
-            return self._fallback.generate_reply(
+            return "[Error: openai package is not installed. Please install it.] " + self._fallback.generate_reply(
                 user_message=user_message,
                 conversation_title=conversation_title,
                 preferred_language=preferred_language,
@@ -188,6 +188,14 @@ class OpenAIProvider:
                 "OpenAI API call failed (%s: %s). Falling back to rule-based provider.",
                 type(exc).__name__,
                 exc,
+            )
+            # Temporarily returning the error for debugging
+            return f"[API Error: {type(exc).__name__} - {exc}] " + self._fallback.generate_reply(
+                user_message=user_message,
+                conversation_title=conversation_title,
+                preferred_language=preferred_language,
+                history=history,
+                mode=mode,
             )
 
         return self._fallback.generate_reply(
