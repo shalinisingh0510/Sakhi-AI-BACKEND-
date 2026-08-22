@@ -1,27 +1,24 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
-import sqlite3
 from datetime import datetime, timezone
-from pathlib import Path
-from threading import RLock
 from uuid import uuid4
+
+from psycopg_pool import ConnectionPool
+from psycopg.rows import dict_row
+import psycopg
 
 from app.core.security import hash_password, verify_password
 from app.services.auth import DuplicateEmailError, InvalidCredentialsError, StoredUser, UserNotFoundError
 
 
-class SQLiteAuthStore:
-    def __init__(self, database_path: str | Path) -> None:
-        self._database_path = str(database_path)
-        self._lock = RLock()
-        self._connection = sqlite3.connect(self._database_path, check_same_thread=False)
-        self._connection.row_factory = sqlite3.Row
-        self._connection.execute("PRAGMA foreign_keys = ON")
+class PostgresAuthStore:
+    def __init__(self, pool: ConnectionPool) -> None:
+        self._pool = pool
         self._initialize_schema()
 
     def _initialize_schema(self) -> None:
-        with self._lock, self._connection:
-            self._connection.execute(
+        with self._pool.connection() as conn:
+            conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
@@ -31,24 +28,15 @@ class SQLiteAuthStore:
                     role TEXT NOT NULL,
                     preferred_language TEXT NOT NULL DEFAULT 'english',
                     created_at TEXT NOT NULL,
-                    is_deleted INTEGER NOT NULL DEFAULT 0,
+                    is_deleted INT NOT NULL DEFAULT 0,
                     deleted_at TEXT,
                     deleted_email TEXT
                 )
                 """
             )
-            self._connection.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
-            self._ensure_column("preferred_language", "TEXT NOT NULL DEFAULT 'english'")
-            self._ensure_column("is_deleted", "INTEGER NOT NULL DEFAULT 0")
-            self._ensure_column("deleted_at", "TEXT")
-            self._ensure_column("deleted_email", "TEXT")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
 
-    def _ensure_column(self, column_name: str, column_definition: str) -> None:
-        columns = {row["name"] for row in self._connection.execute("PRAGMA table_info(users)").fetchall()}
-        if column_name not in columns:
-            self._connection.execute(f"ALTER TABLE users ADD COLUMN {column_name} {column_definition}")
-
-    def _row_to_user(self, row: sqlite3.Row) -> StoredUser:
+    def _row_to_user(self, row: dict) -> StoredUser:
         created_at = datetime.fromisoformat(row["created_at"])
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=timezone.utc)
@@ -81,11 +69,11 @@ class SQLiteAuthStore:
         password_hash = hash_password(password)
 
         try:
-            with self._lock, self._connection:
-                self._connection.execute(
+            with self._pool.connection() as conn:
+                conn.execute(
                     """
                     INSERT INTO users (id, name, email, password_hash, role, preferred_language, created_at, deleted_email)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         user_id,
@@ -98,7 +86,7 @@ class SQLiteAuthStore:
                         None,
                     ),
                 )
-        except sqlite3.IntegrityError as exc:
+        except psycopg.IntegrityError as exc:
             raise DuplicateEmailError("An account already exists for this email.") from exc
 
         user = self.get_by_id(user_id)
@@ -107,19 +95,21 @@ class SQLiteAuthStore:
         return user
 
     def get_by_email(self, email: str) -> StoredUser | None:
-        with self._lock:
-            row = self._connection.execute(
-                "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE email = ? AND is_deleted = 0",
-                (email.strip().lower(),),
-            ).fetchone()
+        with self._pool.connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                row = cursor.execute(
+                    "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE email = %s AND is_deleted = 0",
+                    (email.strip().lower(),),
+                ).fetchone()
         return None if row is None else self._row_to_user(row)
 
     def get_by_id(self, user_id: str) -> StoredUser | None:
-        with self._lock:
-            row = self._connection.execute(
-                "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE id = ? AND is_deleted = 0",
-                (user_id,),
-            ).fetchone()
+        with self._pool.connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                row = cursor.execute(
+                    "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE id = %s AND is_deleted = 0",
+                    (user_id,),
+                ).fetchone()
         return None if row is None else self._row_to_user(row)
 
     def authenticate(self, *, email: str, password: str) -> StoredUser:
@@ -142,14 +132,14 @@ class SQLiteAuthStore:
             normalized_name = name.strip()
             if not normalized_name:
                 raise ValueError("Name cannot be empty.")
-            updates.append("name = ?")
+            updates.append("name = %s")
             params.append(normalized_name)
 
         if preferred_language is not None:
             normalized_language = preferred_language.strip().lower()
             if not normalized_language:
                 raise ValueError("Preferred language cannot be empty.")
-            updates.append("preferred_language = ?")
+            updates.append("preferred_language = %s")
             params.append(normalized_language)
 
         if not updates:
@@ -159,9 +149,9 @@ class SQLiteAuthStore:
             return user
 
         params.append(user_id)
-        with self._lock, self._connection:
-            cursor = self._connection.execute(
-                f"UPDATE users SET {', '.join(updates)} WHERE id = ?",
+        with self._pool.connection() as conn:
+            cursor = conn.execute(
+                f"UPDATE users SET {', '.join(updates)} WHERE id = %s",
                 params,
             )
         if cursor.rowcount == 0:
@@ -174,9 +164,9 @@ class SQLiteAuthStore:
 
     def update_user_role(self, *, user_id: str, role: str) -> StoredUser:
         normalized_role = role.strip().lower()
-        with self._lock, self._connection:
-            cursor = self._connection.execute(
-                "UPDATE users SET role = ? WHERE id = ?",
+        with self._pool.connection() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET role = %s WHERE id = %s",
                 (normalized_role, user_id),
             )
         if cursor.rowcount == 0:
@@ -194,45 +184,47 @@ class SQLiteAuthStore:
         if not verify_password(current_password, user.password_hash):
             raise InvalidCredentialsError("Current password is incorrect.")
         new_hash = hash_password(new_password)
-        with self._lock, self._connection:
-            cursor = self._connection.execute(
-                "UPDATE users SET password_hash = ? WHERE id = ?",
+        with self._pool.connection() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET password_hash = %s WHERE id = %s",
                 (new_hash, user_id),
             )
         if cursor.rowcount == 0:
             raise UserNotFoundError("User not found.")
 
     def list_users(self) -> list[StoredUser]:
-        with self._lock:
-            rows = self._connection.execute(
-                "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE is_deleted = 0 ORDER BY created_at ASC"
-            ).fetchall()
+        with self._pool.connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                rows = cursor.execute(
+                    "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE is_deleted = 0 ORDER BY created_at ASC"
+                ).fetchall()
         return [self._row_to_user(row) for row in rows]
 
     def search_users(self, *, query: str | None = None, role: str | None = None) -> list[StoredUser]:
         conditions: list[str] = ["is_deleted = 0"]
         params: list[object] = []
         if role:
-            conditions.append("LOWER(role) = ?")
+            conditions.append("LOWER(role) = %s")
             params.append(role.strip().lower())
         if query:
             q = f"%{query.strip().lower()}%"
-            conditions.append("(LOWER(name) LIKE ? OR LOWER(email) LIKE ?)")
+            conditions.append("(LOWER(name) LIKE %s OR LOWER(email) LIKE %s)")
             params.extend([q, q])
         sql = "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users"
         sql += " WHERE " + " AND ".join(conditions)
         sql += " ORDER BY created_at ASC"
-        with self._lock:
-            rows = self._connection.execute(sql, params).fetchall()
+        with self._pool.connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                rows = cursor.execute(sql, params).fetchall()
         return [self._row_to_user(row) for row in rows]
 
     def delete_user(self, *, user_id: str) -> None:
         """Soft-delete: mark the user as deleted rather than removing the row."""
         deleted_at = datetime.now(timezone.utc).isoformat()
         tombstone_email = f"deleted-{user_id}@deleted.local"
-        with self._lock, self._connection:
-            cursor = self._connection.execute(
-                "UPDATE users SET is_deleted = 1, deleted_at = ?, deleted_email = email, email = ? WHERE id = ? AND is_deleted = 0",
+        with self._pool.connection() as conn:
+            cursor = conn.execute(
+                "UPDATE users SET is_deleted = 1, deleted_at = %s, deleted_email = email, email = %s WHERE id = %s AND is_deleted = 0",
                 (deleted_at, tombstone_email, user_id),
             )
         if cursor.rowcount == 0:

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from psycopg_pool import ConnectionPool
 
 from app.api.router import api_router
 from app.core.cache import build_cache_backend
@@ -18,13 +20,14 @@ from app.core.middleware import (
 )
 from app.core.token_blacklist import build_token_blacklist
 from app.db import (
-    SQLiteAnalyticsStore,
-    SQLiteAuthStore,
-    SQLiteConversationStore,
-    SQLiteFeedbackStore,
-    SQLiteLessonStore,
-    SQLiteNotificationStore,
-    SQLiteProgressStore,
+    PostgresAnalyticsStore,
+    PostgresAuthStore,
+    PostgresConversationStore,
+    PostgresFeedbackStore,
+    PostgresLessonStore,
+    PostgresMediaStore,
+    PostgresNotificationStore,
+    PostgresProgressStore,
 )
 from app.services.ai import AIService
 from app.services.analytics import AnalyticsService
@@ -32,8 +35,10 @@ from app.services.auth import AuthService, AuthStoreProtocol
 from app.services.email import EmailService, build_email_backend
 from app.services.feedback import FeedbackService
 from app.services.lessons import LessonService
+from app.services.media import MediaService
 from app.services.notifications import NotificationService
 from app.services.progress import ProgressService
+from app.services.storage import CloudflareStorageService
 
 configure_logging()
 startup_logger = logging.getLogger("sakhi.startup")
@@ -45,16 +50,25 @@ def create_app(
 ) -> FastAPI:
     try:
         settings = settings or get_settings()
-        settings.database_path.parent.mkdir(parents=True, exist_ok=True)
+
+        @asynccontextmanager
+        async def lifespan(app: FastAPI):
+            yield
+            if hasattr(app.state, "db_pool"):
+                app.state.db_pool.close()
 
         app = FastAPI(
             title=settings.app_name,
             version=settings.app_version,
             debug=settings.debug,
+            lifespan=lifespan,
         )
 
+        db_pool = ConnectionPool(settings.database_url)
+        app.state.db_pool = db_pool
+
         app.state.settings = settings
-        app.state.auth_store = auth_store or SQLiteAuthStore(settings.database_path)
+        app.state.auth_store = auth_store or PostgresAuthStore(db_pool)
 
         cache_backend = build_cache_backend(
             backend=settings.cache_backend,
@@ -70,11 +84,11 @@ def create_app(
         )
         app.state.token_blacklist = token_blacklist
         app.state.auth_service = AuthService(settings, store=app.state.auth_store, blacklist=token_blacklist)
-        app.state.ai_store = SQLiteConversationStore(settings.database_path)
+        app.state.ai_store = PostgresConversationStore(db_pool)
         app.state.ai_service = AIService(settings, store=app.state.ai_store)
-        app.state.lesson_store = SQLiteLessonStore(settings.database_path)
+        app.state.lesson_store = PostgresLessonStore(db_pool)
         app.state.lesson_service = LessonService(settings, store=app.state.lesson_store, cache=cache_backend)
-        app.state.feedback_store = SQLiteFeedbackStore(settings.database_path)
+        app.state.feedback_store = PostgresFeedbackStore(db_pool)
         app.state.feedback_service = FeedbackService(settings, store=app.state.feedback_store)
 
         # Email service
@@ -89,22 +103,31 @@ def create_app(
         )
         app.state.email_service = EmailService(backend=email_backend)
 
-        app.state.notification_store = SQLiteNotificationStore(settings.database_path)
+        app.state.notification_store = PostgresNotificationStore(db_pool)
         app.state.notification_service = NotificationService(
             settings,
             store=app.state.notification_store,
             auth_store=app.state.auth_store,
             email_service=app.state.email_service,
         )
-        app.state.progress_store = SQLiteProgressStore(settings.database_path)
+        app.state.progress_store = PostgresProgressStore(db_pool)
         app.state.progress_service = ProgressService(
             settings,
             store=app.state.progress_store,
             lesson_service=app.state.lesson_service,
             notification_service=app.state.notification_service,
         )
-        app.state.analytics_store = SQLiteAnalyticsStore(settings.database_path)
+        app.state.analytics_store = PostgresAnalyticsStore(db_pool)
         app.state.analytics_service = AnalyticsService(settings, store=app.state.analytics_store, cache=cache_backend)
+
+        # Media and Storage services
+        app.state.storage_service = CloudflareStorageService(settings)
+        app.state.media_store = PostgresMediaStore(db_pool)
+        app.state.media_service = MediaService(
+            settings,
+            store=app.state.media_store,
+            storage_service=app.state.storage_service
+        )
 
         configure_rate_limiter(settings.rate_limit_requests_per_minute)
 

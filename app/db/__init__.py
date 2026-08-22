@@ -1,17 +1,19 @@
-﻿from .ai_store import SQLiteConversationStore
-from .analytics_store import SQLiteAnalyticsStore
-from .auth_store import SQLiteAuthStore
-from .feedback_store import SQLiteFeedbackStore
-from .lesson_store import SQLiteLessonStore
-from .notification_store import SQLiteNotificationStore
-from .progress_store import SQLiteProgressStore
+from .ai_store import PostgresConversationStore
+from .analytics_store import PostgresAnalyticsStore
+from .auth_store import PostgresAuthStore
+from .feedback_store import PostgresFeedbackStore
+from .lesson_store import PostgresLessonStore
+from .notification_store import PostgresNotificationStore
+from .progress_store import PostgresProgressStore
+from .media_store import PostgresMediaStore
 
 __all__ = [
-    "SQLiteAuthStore",
-    "SQLiteConversationStore",
-    "SQLiteFeedbackStore",
-    "SQLiteLessonStore",
-    "SQLiteNotificationStore",
-    "SQLiteProgressStore",
-    "SQLiteAnalyticsStore",
+    "PostgresAuthStore",
+    "PostgresConversationStore",
+    "PostgresFeedbackStore",
+    "PostgresLessonStore",
+    "PostgresNotificationStore",
+    "PostgresProgressStore",
+    "PostgresAnalyticsStore",
+    "PostgresMediaStore",
 ]
