@@ -77,7 +77,7 @@ def delete_period(
     log_id: str,
     current_user: StoredUser = Depends(get_current_user),
     cycle_service: CycleService = Depends(get_cycle_service),
-) -> Any:
+) -> None:
     """Delete a period log."""
     cycle_service.delete_period(current_user.id, log_id)
     return None
