@@ -113,7 +113,7 @@ def delete_symptom(
     log_id: str,
     current_user: StoredUser = Depends(get_current_user),
     wellness_service: WellnessService = Depends(get_wellness_service),
-) -> Any:
+) -> None:
     wellness_service.delete_symptom(current_user.id, log_id)
     return None
 
@@ -162,7 +162,7 @@ def delete_mood(
     log_id: str,
     current_user: StoredUser = Depends(get_current_user),
     wellness_service: WellnessService = Depends(get_wellness_service),
-) -> Any:
+) -> None:
     wellness_service.delete_mood(current_user.id, log_id)
     return None
 
@@ -204,6 +204,6 @@ def delete_energy(
     log_id: str,
     current_user: StoredUser = Depends(get_current_user),
     wellness_service: WellnessService = Depends(get_wellness_service),
-) -> Any:
+) -> None:
     wellness_service.delete_energy(current_user.id, log_id)
     return None
