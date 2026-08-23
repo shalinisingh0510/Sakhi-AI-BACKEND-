@@ -30,6 +30,11 @@ def _build_engine(database_url: str) -> "Engine":
     * SSL is expected to be configured via the connection string
       (e.g. ``?sslmode=require``).
     """
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+    elif database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
     connect_args: dict = {}
 
     engine = create_engine(
