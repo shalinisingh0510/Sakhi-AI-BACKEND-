@@ -17,12 +17,12 @@ class SymptomLog(Base):
     __tablename__ = "symptom_logs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    health_profile_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    health_profile_id: Mapped[str] = mapped_column(String(36), ForeignKey("health_profiles.id", ondelete="CASCADE"), nullable=False)
     
     # Optional link to a specific menstrual cycle record.
     # We don't use a strict FK constraint to avoid CASCADE complexities if cycles are recalculated,
     # but logically it points to menstrual_cycles.id
-    cycle_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    cycle_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("menstrual_cycles.id", ondelete="SET NULL"), nullable=True)
     cycle_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
     
     symptom_code: Mapped[str] = mapped_column(String(50), nullable=False)
