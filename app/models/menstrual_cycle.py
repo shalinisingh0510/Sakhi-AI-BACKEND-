@@ -35,6 +35,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -125,10 +126,10 @@ class MenstrualCycle(Base):
 
     # Derived integers — computed by cycle_engine.
     cycle_length_days: Mapped[int | None] = mapped_column(
-        String(10), nullable=True
+        sa.Integer, nullable=True
     )
     period_duration_days: Mapped[int | None] = mapped_column(
-        String(10), nullable=True
+        sa.Integer, nullable=True
     )
 
     is_complete: Mapped[bool] = mapped_column(

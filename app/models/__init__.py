@@ -20,7 +20,9 @@ from app.models.menstrual_cycle import (  # noqa: F401
     PeriodLog,
 )
 
-# Future model imports — uncomment as models are created:
-# from app.models.symptom import SymptomLog  # noqa: F401
+# Wellness models (Phase 3)
+from app.models.symptom_log import SymptomLog  # noqa: F401
+from app.models.mood_log import MoodLog  # noqa: F401
+from app.models.energy_log import EnergyLog  # noqa: F401
 
 

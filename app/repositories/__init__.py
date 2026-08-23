@@ -11,6 +11,11 @@ from app.repositories.cycle import (
     MenstrualCycleRepository,
     PeriodLogRepository,
 )
+from app.repositories.wellness import (
+    SymptomLogRepository,
+    MoodLogRepository,
+    EnergyLogRepository,
+)
 
 __all__ = [
     "HealthConditionRepository",
@@ -18,4 +23,7 @@ __all__ = [
     "CyclePredictionRepository",
     "MenstrualCycleRepository",
     "PeriodLogRepository",
+    "SymptomLogRepository",
+    "MoodLogRepository",
+    "EnergyLogRepository",
 ]
