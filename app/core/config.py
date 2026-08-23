@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     redis_token_blacklist_prefix: str = "sakhi:token-blacklist"
     redis_cache_prefix: str = "sakhi:cache"
     cache_ttl_seconds: int = 300
+    # Celery background task settings
+    celery_broker_url: str = "redis://localhost:6379/1"
+    celery_result_backend: str = "redis://localhost:6379/2"
+    celery_always_eager: bool = False
     # Pagination defaults
     default_page_size: int = 20
     max_page_size: int = 100
