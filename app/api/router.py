@@ -15,8 +15,10 @@ from app.api.v1.endpoints.recommendations import router as recommendations_route
 from app.api.v1.endpoints.progress import router as progress_router
 from app.api.v1.endpoints.ws import router as ws_router
 from app.api.v1.endpoints.cycles import router as cycles_router
+from app.api.v1.endpoints.wellness import router as wellness_router
 
 api_router = APIRouter()
+api_router.include_router(wellness_router, prefix="/api/v1")
 api_router.include_router(cycles_router, prefix="/api/v1")
 api_router.include_router(health_router, prefix="/api/v1")
 api_router.include_router(health_profile_router, prefix="/api/v1")
