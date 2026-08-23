@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from fastapi import Depends, Header, HTTPException, Query, Request, status
 
@@ -9,6 +9,7 @@ from app.services.feedback import FeedbackService
 from app.services.lessons import LessonService
 from app.services.notifications import NotificationService
 from app.services.progress import ProgressService
+from app.services.recommendations import RecommendationService
 
 
 def get_auth_service(request: Request) -> AuthService:
@@ -33,6 +34,10 @@ def get_feedback_service(request: Request) -> FeedbackService:
 
 def get_progress_service(request: Request) -> ProgressService:
     return request.app.state.progress_service
+
+
+def get_recommendation_service(request: Request) -> RecommendationService:
+    return request.app.state.recommendation_service
 
 
 def get_analytics_service(request: Request) -> AnalyticsService:

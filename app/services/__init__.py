@@ -1,4 +1,4 @@
-﻿from .ai import (
+from .ai import (
     AIService,
     ConversationAccessDeniedError,
     ConversationError,
@@ -60,6 +60,7 @@ from .progress import (
     ProgressStoreProtocol,
     StoredLessonProgress,
 )
+from .recommendations import RecommendationService
 
 __all__ = [
     "AIService",
@@ -104,6 +105,7 @@ __all__ = [
     "ProgressOverview",
     "ProgressService",
     "ProgressStoreProtocol",
+    "RecommendationService",
     "StoredConversation",
     "StoredConversationMessage",
     "StoredFeedback",

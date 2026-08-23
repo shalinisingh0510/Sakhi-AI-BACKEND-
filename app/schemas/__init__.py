@@ -1,4 +1,4 @@
-﻿from .ai import ConversationDetail, ConversationMessage, ConversationSummary, CreateConversationRequest, SendMessageRequest
+from .ai import ConversationDetail, ConversationMessage, ConversationSummary, CreateConversationRequest, SendMessageRequest
 from .analytics import (
     AnalyticsEvent,
     AnalyticsReport,
@@ -28,6 +28,7 @@ from .notification import (
     UnreadCountResponse,
 )
 from .progress import LessonProgressItem, ProgressOverview, UpdateProgressRequest
+from .recommendation import RecommendedLesson
 
 __all__ = [
     "AnalyticsEvent",
@@ -59,6 +60,7 @@ __all__ = [
     "PlatformOverview",
     "ProgressOverview",
     "PublicUser",
+    "RecommendedLesson",
     "RefreshRequest",
     "RegisterRequest",
     "SendMessageRequest",
