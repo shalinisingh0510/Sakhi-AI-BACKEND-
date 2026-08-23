@@ -44,9 +44,7 @@ class WellnessDashboardService:
             )
 
         # 1. Today Snapshot
-        today_symptoms = self._symptom_repo.list_by_profile(profile.id, limit=50)
-        # Filter for today (since repo list doesn't take date arg in Phase 3 without custom method)
-        today_symptoms = [s for s in today_symptoms if s.start_date == local_date]
+        today_symptoms = self._symptom_repo.list_by_profile_and_date(profile.id, local_date)
         
         today_mood = self._mood_repo.get_by_profile_and_date(profile.id, local_date)
         today_energy = self._energy_repo.get_by_profile_and_date(profile.id, local_date)

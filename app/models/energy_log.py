@@ -14,14 +14,14 @@ class EnergyLog(Base):
     __tablename__ = "energy_logs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
-    health_profile_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    health_profile_id: Mapped[str] = mapped_column(String(36), ForeignKey("health_profiles.id", ondelete="CASCADE"), nullable=False)
     
     energy_level: Mapped[str] = mapped_column(String(50), nullable=False)
     
     log_date: Mapped[date] = mapped_column(Date, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    cycle_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    cycle_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("menstrual_cycles.id", ondelete="SET NULL"), nullable=True)
     cycle_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
