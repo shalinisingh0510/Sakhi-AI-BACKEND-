@@ -38,6 +38,7 @@ from app.services.lessons import LessonService
 from app.services.media import MediaService
 from app.services.notifications import NotificationService
 from app.services.progress import ProgressService
+from app.services.recommendations import RecommendationService
 from app.services.storage import CloudflareStorageService
 
 configure_logging()
@@ -119,6 +120,11 @@ def create_app(
         )
         app.state.analytics_store = PostgresAnalyticsStore(db_pool)
         app.state.analytics_service = AnalyticsService(settings, store=app.state.analytics_store, cache=cache_backend)
+        app.state.recommendation_service = RecommendationService(
+            lesson_service=app.state.lesson_service,
+            progress_service=app.state.progress_service,
+            analytics_service=app.state.analytics_service,
+        )
 
         # Media and Storage services
         app.state.storage_service = CloudflareStorageService(settings)
@@ -126,7 +132,7 @@ def create_app(
         app.state.media_service = MediaService(
             settings,
             store=app.state.media_store,
-            storage_service=app.state.storage_service
+            storage_service=app.state.storage_service,
         )
 
         configure_rate_limiter(settings.rate_limit_requests_per_minute)
