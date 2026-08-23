@@ -15,6 +15,7 @@ Sub-modules:
 from app.domain.health.age_policy import AgePolicy
 from app.domain.health.constants import EventSource, EventType, WELLNESS_DISCLAIMER
 from app.domain.health.events import HealthEventSchema
+from app.domain.health.feature_policy import HealthFeaturePolicy
 from app.domain.health.integrations import HealthDataProvider
 from app.domain.health.privacy import HealthPrivacyGate
 
@@ -24,6 +25,7 @@ __all__ = [
     "EventType",
     "HealthDataProvider",
     "HealthEventSchema",
+    "HealthFeaturePolicy",
     "HealthPrivacyGate",
     "WELLNESS_DISCLAIMER",
 ]

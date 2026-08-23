@@ -64,3 +64,4 @@ class EventType(StrEnum):
 TEEN_AGE_MIN = 14
 TEEN_AGE_MAX = 17
 ADULT_AGE_MIN = 18
+HEALTH_HUB_MIN_AGE = 14   # users below this age cannot access the Health Hub

@@ -29,6 +29,7 @@ from app.db import (
     PostgresNotificationStore,
     PostgresProgressStore,
 )
+from app.db.session import init_db
 from app.services.ai import AIService
 from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService, AuthStoreProtocol
@@ -67,6 +68,9 @@ def create_app(
 
         db_pool = ConnectionPool(settings.database_url)
         app.state.db_pool = db_pool
+
+        # Initialise SQLAlchemy engine (used by health domain and future ORM-backed services).
+        init_db(settings.database_url)
 
         app.state.settings = settings
         app.state.auth_store = auth_store or PostgresAuthStore(db_pool)
