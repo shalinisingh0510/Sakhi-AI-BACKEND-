@@ -5,5 +5,6 @@ SQLAlchemy models, and re-exports concrete repositories.
 """
 
 from app.repositories.base import BaseRepository
+from app.repositories.health import HealthConditionRepository, HealthProfileRepository
 
-__all__ = ["BaseRepository"]
+__all__ = ["BaseRepository", "HealthConditionRepository", "HealthProfileRepository"]
