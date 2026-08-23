@@ -13,6 +13,14 @@ from app.db.base import Base  # noqa: F401 — re-export for Alembic
 # Health domain models (Phase 1)
 from app.models.health_profile import HealthCondition, HealthProfile  # noqa: F401
 
+# Menstrual cycle models (Phase 2)
+from app.models.menstrual_cycle import (  # noqa: F401
+    CyclePrediction,
+    MenstrualCycle,
+    PeriodLog,
+)
+
 # Future model imports — uncomment as models are created:
-# from app.models.health import HealthEvent  # noqa: F401
+# from app.models.symptom import SymptomLog  # noqa: F401
+
 
