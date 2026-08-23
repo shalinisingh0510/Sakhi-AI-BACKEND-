@@ -231,6 +231,31 @@ class WellnessService:
         logs = self._symptom_repo.list_by_profile(profile.id, limit=limit, offset=offset)
         return [SymptomLogResponse.model_validate(log) for log in logs]
 
+    def get_symptom(self, user_id: str, log_id: str) -> SymptomLogResponse:
+        profile = self._assert_wellness_access(user_id)
+        log = self._symptom_repo.get_by_id_and_profile(log_id, profile.id)
+        if not log:
+            raise HTTPException(404, "Symptom log not found.")
+        return SymptomLogResponse.model_validate(log)
+
+    def update_symptom(self, user_id: str, log_id: str, data: dict[str, Any]) -> SymptomLogResponse:
+        profile = self._assert_wellness_access(user_id)
+        with transactional(self._session):
+            log = self._symptom_repo.get_by_id_and_profile(log_id, profile.id)
+            if not log:
+                raise HTTPException(404, "Symptom log not found.")
+            
+            if "severity" in data:
+                log.severity = data["severity"]
+            if "end_date" in data:
+                log.end_date = data["end_date"]
+            if "notes" in data:
+                log.notes = data["notes"]
+            
+            self._symptom_repo.add(log)
+            
+        return SymptomLogResponse.model_validate(log)
+
     def delete_symptom(self, user_id: str, log_id: str) -> None:
         profile = self._assert_wellness_access(user_id)
         with transactional(self._session):
@@ -242,7 +267,58 @@ class WellnessService:
     # ------------------------------------------------------------------------
     # Mood & Energy Individual Endpoints (can be added if required beyond checkin)
     # ------------------------------------------------------------------------
-    # Phase 3 allows individual PATCH/DELETE per the spec, so here is the delete
+
+    def log_mood(self, user_id: str, data: MoodLogCreate) -> MoodLogResponse:
+        profile = self._assert_wellness_access(user_id)
+        cycle_id, cycle_day = self._determine_cycle(profile.id, data.log_date)
+        with transactional(self._session):
+            existing_mood = self._mood_repo.get_by_profile_and_date(profile.id, data.log_date)
+            if existing_mood:
+                existing_mood.mood_code = data.mood_code.value
+                existing_mood.intensity = data.intensity.value
+                existing_mood.notes = data.notes
+                existing_mood.cycle_id = cycle_id
+                existing_mood.cycle_day = cycle_day
+                return MoodLogResponse.model_validate(existing_mood)
+            else:
+                new_mood = MoodLog(
+                    id=str(uuid4()),
+                    health_profile_id=profile.id,
+                    mood_code=data.mood_code.value,
+                    intensity=data.intensity.value,
+                    log_date=data.log_date,
+                    notes=data.notes,
+                    cycle_id=cycle_id,
+                    cycle_day=cycle_day,
+                )
+                self._mood_repo.add(new_mood)
+                return MoodLogResponse.model_validate(new_mood)
+
+    def get_mood(self, user_id: str, log_id: str) -> MoodLogResponse:
+        profile = self._assert_wellness_access(user_id)
+        log = self._mood_repo.get_by_id_and_profile(log_id, profile.id)
+        if not log:
+            raise HTTPException(404, "Mood log not found.")
+        return MoodLogResponse.model_validate(log)
+
+    def list_moods(self, user_id: str, limit: int = 30) -> list[MoodLogResponse]:
+        profile = self._assert_wellness_access(user_id)
+        logs = self._mood_repo.list_by_profile(profile.id, limit=limit)
+        return [MoodLogResponse.model_validate(log) for log in logs]
+
+    def update_mood(self, user_id: str, log_id: str, data: dict[str, Any]) -> MoodLogResponse:
+        profile = self._assert_wellness_access(user_id)
+        with transactional(self._session):
+            log = self._mood_repo.get_by_id_and_profile(log_id, profile.id)
+            if not log:
+                raise HTTPException(404, "Mood log not found.")
+            if "intensity" in data:
+                log.intensity = data["intensity"]
+            if "notes" in data:
+                log.notes = data["notes"]
+            self._mood_repo.add(log)
+        return MoodLogResponse.model_validate(log)
+
     def delete_mood(self, user_id: str, log_id: str) -> None:
         profile = self._assert_wellness_access(user_id)
         with transactional(self._session):
@@ -251,6 +327,55 @@ class WellnessService:
                 raise HTTPException(404, "Mood log not found.")
             self._mood_repo.delete(log)
             
+    def log_energy(self, user_id: str, data: EnergyLogCreate) -> EnergyLogResponse:
+        profile = self._assert_wellness_access(user_id)
+        cycle_id, cycle_day = self._determine_cycle(profile.id, data.log_date)
+        with transactional(self._session):
+            existing_energy = self._energy_repo.get_by_profile_and_date(profile.id, data.log_date)
+            if existing_energy:
+                existing_energy.energy_level = data.energy_level.value
+                existing_energy.notes = data.notes
+                existing_energy.cycle_id = cycle_id
+                existing_energy.cycle_day = cycle_day
+                return EnergyLogResponse.model_validate(existing_energy)
+            else:
+                new_energy = EnergyLog(
+                    id=str(uuid4()),
+                    health_profile_id=profile.id,
+                    energy_level=data.energy_level.value,
+                    log_date=data.log_date,
+                    notes=data.notes,
+                    cycle_id=cycle_id,
+                    cycle_day=cycle_day,
+                )
+                self._energy_repo.add(new_energy)
+                return EnergyLogResponse.model_validate(new_energy)
+
+    def get_energy(self, user_id: str, log_id: str) -> EnergyLogResponse:
+        profile = self._assert_wellness_access(user_id)
+        log = self._energy_repo.get_by_id_and_profile(log_id, profile.id)
+        if not log:
+            raise HTTPException(404, "Energy log not found.")
+        return EnergyLogResponse.model_validate(log)
+
+    def list_energy(self, user_id: str, limit: int = 30) -> list[EnergyLogResponse]:
+        profile = self._assert_wellness_access(user_id)
+        logs = self._energy_repo.list_by_profile(profile.id, limit=limit)
+        return [EnergyLogResponse.model_validate(log) for log in logs]
+
+    def update_energy(self, user_id: str, log_id: str, data: dict[str, Any]) -> EnergyLogResponse:
+        profile = self._assert_wellness_access(user_id)
+        with transactional(self._session):
+            log = self._energy_repo.get_by_id_and_profile(log_id, profile.id)
+            if not log:
+                raise HTTPException(404, "Energy log not found.")
+            if "energy_level" in data:
+                log.energy_level = data["energy_level"]
+            if "notes" in data:
+                log.notes = data["notes"]
+            self._energy_repo.add(log)
+        return EnergyLogResponse.model_validate(log)
+
     def delete_energy(self, user_id: str, log_id: str) -> None:
         profile = self._assert_wellness_access(user_id)
         with transactional(self._session):
