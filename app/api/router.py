@@ -16,8 +16,10 @@ from app.api.v1.endpoints.progress import router as progress_router
 from app.api.v1.endpoints.ws import router as ws_router
 from app.api.v1.endpoints.cycles import router as cycles_router
 from app.api.v1.endpoints.wellness import router as wellness_router
+from app.api.v1.endpoints.nutrition import router as nutrition_router
 
 api_router = APIRouter()
+api_router.include_router(nutrition_router, prefix="/api/v1")
 api_router.include_router(wellness_router, prefix="/api/v1")
 api_router.include_router(cycles_router, prefix="/api/v1")
 api_router.include_router(health_router, prefix="/api/v1")

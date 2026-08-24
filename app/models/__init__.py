@@ -25,4 +25,10 @@ from app.models.symptom_log import SymptomLog  # noqa: F401
 from app.models.mood_log import MoodLog  # noqa: F401
 from app.models.energy_log import EnergyLog  # noqa: F401
 
-
+# Nutrition models (Phase 5)
+from app.models.nutrition import (  # noqa: F401
+    Food,
+    FoodServingOption,
+    NutritionLog,
+    NutritionLogItem,
+)
