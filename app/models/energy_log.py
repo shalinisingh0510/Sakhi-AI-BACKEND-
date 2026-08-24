@@ -5,7 +5,7 @@ energy_logs:
 """
 from __future__ import annotations
 from datetime import date, datetime
-from sqlalchemy import Date, DateTime, Integer, String, Text, Index, func, UniqueConstraint
+from sqlalchemy import Date, DateTime, Integer, String, Text, Index, func, UniqueConstraint, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base

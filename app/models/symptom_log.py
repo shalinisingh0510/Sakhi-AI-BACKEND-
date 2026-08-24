@@ -8,7 +8,7 @@ symptom_logs:
 """
 from __future__ import annotations
 from datetime import date, datetime
-from sqlalchemy import Date, DateTime, Integer, String, Text, ForeignKey, Index, func
+from sqlalchemy import Date, DateTime, Integer, String, Text, ForeignKey, Index, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
