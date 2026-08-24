@@ -100,7 +100,10 @@ class NutritionService:
             authenticated_user_id=user_id,
             profile=profile,
         )
-        gate.assert_owner(profile.user_id)
+        try:
+            gate.assert_owner(profile.user_id)
+        except PermissionError as exc:
+            raise HTTPException(403, str(exc)) from exc
 
         age_policy = AgePolicy.from_dob(profile.date_of_birth)
         if not age_policy.is_health_hub_allowed():
