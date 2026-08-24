@@ -66,7 +66,11 @@ def create_app(
             lifespan=lifespan,
         )
 
-        db_pool = ConnectionPool(settings.database_url)
+        db_pool = ConnectionPool(
+            settings.database_url,
+            kwargs={"connect_timeout": 10},
+            check=False,
+        )
         app.state.db_pool = db_pool
 
         # Initialise SQLAlchemy engine (used by health domain and future ORM-backed services).
