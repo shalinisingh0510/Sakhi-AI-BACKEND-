@@ -47,6 +47,7 @@ class HealthProfile(Base):
 
     # Age & body
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
+    biological_sex: Mapped[str | None] = mapped_column(String(20), nullable=True)
     height_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
     weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
 

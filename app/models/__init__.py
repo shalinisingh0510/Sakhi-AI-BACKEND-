@@ -9,26 +9,28 @@ models (health, wellness, etc.) should be added here.
 """
 
 from app.db.base import Base  # noqa: F401 — re-export for Alembic
+from app.models.activity import ActivityLog
+from app.models.energy_log import EnergyLog
+from app.models.health import HealthMetric
+from app.models.health_profile import HealthCondition, HealthProfile
+from app.models.menstrual_cycle import CycleLog, MenstrualCycle
+from app.models.mood_log import MoodLog
+from app.models.nutrition import Food, FoodServingOption, NutritionLog, NutritionLogItem
+from app.models.symptom_log import SymptomLog
 
-# Health domain models (Phase 1)
-from app.models.health_profile import HealthCondition, HealthProfile  # noqa: F401
-
-# Menstrual cycle models (Phase 2)
-from app.models.menstrual_cycle import (  # noqa: F401
-    CyclePrediction,
-    MenstrualCycle,
-    PeriodLog,
-)
-
-# Wellness models (Phase 3)
-from app.models.symptom_log import SymptomLog  # noqa: F401
-from app.models.mood_log import MoodLog  # noqa: F401
-from app.models.energy_log import EnergyLog  # noqa: F401
-
-# Nutrition models (Phase 5)
-from app.models.nutrition import (  # noqa: F401
-    Food,
-    FoodServingOption,
-    NutritionLog,
-    NutritionLogItem,
-)
+# This ensures Alembic can discover all models when it imports Base
+__all__ = [
+    "ActivityLog",
+    "CycleLog",
+    "EnergyLog",
+    "Food",
+    "FoodServingOption",
+    "HealthCondition",
+    "HealthMetric",
+    "HealthProfile",
+    "MenstrualCycle",
+    "MoodLog",
+    "NutritionLog",
+    "NutritionLogItem",
+    "SymptomLog",
+]

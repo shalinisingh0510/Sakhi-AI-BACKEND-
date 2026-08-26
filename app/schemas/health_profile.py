@@ -63,6 +63,9 @@ class HealthProfileCreate(BaseModel):
     """Schema for creating a new health profile (POST /api/v1/health-profile)."""
 
     date_of_birth: date = Field(..., description="User's date of birth")
+    biological_sex: str | None = Field(
+        default=None, description="MALE or FEMALE for calorie calculations"
+    )
     height_cm: float | None = Field(
         default=None, ge=50.0, le=300.0, description="Height in centimetres"
     )
@@ -113,6 +116,7 @@ class HealthProfileUpdate(BaseModel):
     """
 
     height_cm: float | None = Field(default=None, ge=50.0, le=300.0)
+    biological_sex: str | None = None
     weight_kg: float | None = Field(default=None, ge=10.0, le=500.0)
     activity_level: ActivityLevel | None = None
     diet_type: DietType | None = None
@@ -132,6 +136,7 @@ class HealthProfileResponse(BaseModel):
     id: str
     user_id: str
     date_of_birth: date
+    biological_sex: str | None
     height_cm: float | None
     weight_kg: float | None
     activity_level: str
