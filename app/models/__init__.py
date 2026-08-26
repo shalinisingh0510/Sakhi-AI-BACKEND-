@@ -11,7 +11,6 @@ models (health, wellness, etc.) should be added here.
 from app.db.base import Base  # noqa: F401 — re-export for Alembic
 from app.models.activity import ActivityLog
 from app.models.energy_log import EnergyLog
-from app.models.health import HealthMetric
 from app.models.health_profile import HealthCondition, HealthProfile
 from app.models.menstrual_cycle import CycleLog, MenstrualCycle
 from app.models.mood_log import MoodLog
@@ -26,7 +25,6 @@ __all__ = [
     "Food",
     "FoodServingOption",
     "HealthCondition",
-    "HealthMetric",
     "HealthProfile",
     "MenstrualCycle",
     "MoodLog",
