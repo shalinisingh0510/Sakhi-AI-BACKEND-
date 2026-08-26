@@ -40,6 +40,10 @@ Restrictions:
 - Do not discuss unrelated topics (politics, entertainment, etc.).
 - Do not provide harmful, misleading, or explicit content.
 - If a message seems to describe a medical emergency, direct the user to seek immediate help.
+- If personal health context is provided, you may use it to personalize the response.
+- NEVER claim that an observed pattern is the CAUSE of a symptom (e.g., do not say "your period caused your fatigue"). State it as an observation.
+- If asked about personal data you don't have in the context, explicitly say you don't have that information.
+- Distinguish between "USER_REPORTED", "DERIVED_PATTERN", etc. when explaining data back to the user.
 """
 
 _VOICE_MODE_PROMPT = """
@@ -60,6 +64,7 @@ class AIProviderProtocol(Protocol):
         preferred_language: str,
         history: list[dict[str, str]],
         mode: str = "text",
+        health_context: dict | None = None,
     ) -> str:
         """Return an assistant reply string."""
         ...
@@ -83,6 +88,7 @@ class RuleBasedProvider:
         preferred_language: str,
         history: list[dict[str, str]],
         mode: str = "text",
+        health_context: dict | None = None,
     ) -> str:
         message = user_message.lower()
         history_note = f"We are continuing the conversation titled '{conversation_title}'."
@@ -152,6 +158,7 @@ class OpenAIProvider:
         preferred_language: str,
         history: list[dict[str, str]],
         mode: str = "text",
+        health_context: dict | None = None,
     ) -> str:
         if self._client is None:
             return "[Error: openai package is not installed. Please install it.] " + self._fallback.generate_reply(
@@ -162,14 +169,17 @@ class OpenAIProvider:
                 mode=mode,
             )
 
-        system_prompt = _SYSTEM_PROMPT
+        messages = [{"role": "system", "content": _SYSTEM_PROMPT}]
+        if health_context:
+            import json
+            messages.append({"role": "system", "content": f"User's personal health context:\n{json.dumps(health_context, indent=2)}"})
+        
         if mode == "voice":
-            system_prompt += "\n" + _VOICE_MODE_PROMPT
+            messages.append({"role": "system", "content": _VOICE_MODE_PROMPT})
 
         if preferred_language != _DEFAULT_CONVERSATION_LANGUAGE:
-            system_prompt += f"\n\nPlease respond in {preferred_language}."
+            messages.append({"role": "system", "content": f"Please respond in {preferred_language}."})
 
-        messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
         messages.extend(history)
         messages.append({"role": "user", "content": user_message})
 
@@ -225,6 +235,8 @@ class GeminiProvider:
     """Calls the Google Gemini API."""
 
     def __init__(self, api_key: str, model: str = "gemini-1.5-flash") -> None:
+        self.api_key = api_key
+        self.model_name = model
         try:
             import google.generativeai as genai # type: ignore[import]
             genai.configure(api_key=api_key)
@@ -242,6 +254,7 @@ class GeminiProvider:
         preferred_language: str,
         history: list[dict[str, str]],
         mode: str = "text",
+        health_context: dict | None = None,
     ) -> str:
         if self._client is None:
             return self._fallback.generate_reply(
@@ -253,6 +266,10 @@ class GeminiProvider:
             )
 
         system_prompt = _SYSTEM_PROMPT
+        if health_context:
+            import json
+            system_prompt += f"\n\nUser's personal health context:\n{json.dumps(health_context, indent=2)}"
+
         if mode == "voice":
             system_prompt += "\n" + _VOICE_MODE_PROMPT
 

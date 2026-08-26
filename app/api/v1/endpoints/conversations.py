@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from sqlalchemy.orm import Session
+
 from app.api.dependencies import get_ai_service, get_current_user, pagination_params
+from app.db.dependencies import get_db
 from app.schemas.ai import ConversationDetail, ConversationSummary, CreateConversationRequest, SendMessageRequest
 from app.services.ai import AIService, ConversationNotFoundError
 from app.services.auth import StoredUser
+from app.services.ai_context.context_builder import HealthContextBuilder
+from app.services.ai_context.router import HealthContextRouter
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
@@ -26,13 +31,19 @@ def create_conversation(
     payload: CreateConversationRequest,
     current_user: StoredUser = Depends(get_current_user),
     ai_service: AIService = Depends(get_ai_service),
+    db: Session = Depends(get_db),
 ) -> ConversationDetail:
+    scopes = HealthContextRouter.determine_scopes(payload.initial_message)
+    context_obj = HealthContextBuilder(db, current_user.id).build_context(scopes)
+    health_context_dict = context_obj.model_dump() if context_obj else None
+
     return ai_service.create_conversation(
         user_id=current_user.id,
         title=payload.title,
         initial_message=payload.initial_message,
         preferred_language=payload.preferred_language,
         mode=payload.mode,
+        health_context=health_context_dict,
     )
 
 
@@ -54,8 +65,19 @@ def send_message(
     payload: SendMessageRequest,
     current_user: StoredUser = Depends(get_current_user),
     ai_service: AIService = Depends(get_ai_service),
+    db: Session = Depends(get_db),
 ) -> ConversationDetail:
+    scopes = HealthContextRouter.determine_scopes(payload.message)
+    context_obj = HealthContextBuilder(db, current_user.id).build_context(scopes)
+    health_context_dict = context_obj.model_dump() if context_obj else None
+
     try:
-        return ai_service.send_message(user_id=current_user.id, conversation_id=conversation_id, message=payload.message, mode=payload.mode)
+        return ai_service.send_message(
+            user_id=current_user.id,
+            conversation_id=conversation_id,
+            message=payload.message,
+            mode=payload.mode,
+            health_context=health_context_dict,
+        )
     except ConversationNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
