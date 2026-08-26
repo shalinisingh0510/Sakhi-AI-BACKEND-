@@ -103,6 +103,7 @@ class AIService:
         initial_message: str,
         preferred_language: str | None = None,
         mode: str = "text",
+        health_context: dict | None = None,
     ) -> ConversationDetail:
         language = self._normalize_language(preferred_language)
         conversation_title = self._normalize_title(title, initial_message)
@@ -121,6 +122,7 @@ class AIService:
                 preferred_language=conversation.preferred_language,
                 history=[],
                 mode=mode,
+                health_context=health_context,
             ),
         )
         return self.get_conversation(user_id=user_id, conversation_id=conversation.id)
@@ -140,6 +142,7 @@ class AIService:
         conversation_id: str,
         message: str,
         mode: str = "text",
+        health_context: dict | None = None,
     ) -> ConversationDetail:
         conversation = self._require_owned_conversation(user_id=user_id, conversation_id=conversation_id)
         self._store.add_message(conversation_id=conversation.id, role="user", content=message)
@@ -151,6 +154,7 @@ class AIService:
             preferred_language=conversation.preferred_language,
             history=history,
             mode=mode,
+            health_context=health_context,
         )
         self._store.add_message(conversation_id=conversation.id, role="assistant", content=reply_text)
         return self.get_conversation(user_id=user_id, conversation_id=conversation.id)
