@@ -25,7 +25,7 @@ class WellnessGoal(Base):
     __tablename__ = "wellness_goals"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
     goal_type: Mapped[str] = mapped_column(String, nullable=False)  # e.g., 'BETTER_NUTRITION'
     priority: Mapped[int] = mapped_column(Integer, default=1)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -40,7 +40,7 @@ class WellnessPlan(Base):
     __tablename__ = "wellness_plans"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
     goal_id: Mapped[Optional[str]] = mapped_column(ForeignKey("wellness_goals.id"))
     
     title: Mapped[str] = mapped_column(String, nullable=False)

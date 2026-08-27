@@ -19,7 +19,7 @@ class AIObservabilityLog(Base):
     __tablename__ = "ai_observability_logs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
     
     # Tracking identifiers
     request_id: Mapped[str] = mapped_column(String, index=True)

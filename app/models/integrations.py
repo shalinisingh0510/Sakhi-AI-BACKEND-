@@ -31,7 +31,7 @@ class HealthProviderConnection(Base):
     __tablename__ = "health_provider_connections"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
     provider: Mapped[ProviderType] = mapped_column(Enum(ProviderType), nullable=False)
     status: Mapped[ConnectionStatus] = mapped_column(Enum(ConnectionStatus), default=ConnectionStatus.CONNECTED)
     
