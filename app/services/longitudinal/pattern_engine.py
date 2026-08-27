@@ -48,10 +48,10 @@ class SymptomPatternEngine:
         # Here we do a basic dummy correlation for Phase 8 architecture demonstration.
         
         # Map date to cycle phase if cycle log exists and indicates menses
-        menses_dates = {c.log_date for c in cycle_logs if c.menses_flow and c.menses_flow != "NONE"}
+        menses_dates = {c.cycle_start_date for c in cycle_logs if hasattr(c, 'menses_flow') and c.menses_flow and c.menses_flow != "NONE"}
         
-        symptoms_during_menses = Counter(s.symptom_code for s in symptoms if s.log_date in menses_dates)
-        symptoms_outside_menses = Counter(s.symptom_code for s in symptoms if s.log_date not in menses_dates)
+        symptoms_during_menses = Counter(s.symptom_code for s in symptoms if s.start_date in menses_dates)
+        symptoms_outside_menses = Counter(s.symptom_code for s in symptoms if s.start_date not in menses_dates)
         
         patterns = []
         for code, in_count in symptoms_during_menses.items():

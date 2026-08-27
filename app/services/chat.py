@@ -13,44 +13,9 @@ SUPPORTED_LANGUAGE_SET = {lang.lower() for lang in SUPPORTED_LANGUAGES}
 DEFAULT_LANGUAGE = "english"
 DEFAULT_TITLE = "Health guidance"
 
+from app.services.ai_context.context_builder import HealthContextBuilder, AIHealthContext
+from app.db.session import SessionLocal
 
-def generate_temporary_response(message: str, language: str) -> str:
-    """
-    Generate a controlled temporary assistant response for Phase 2.
-    Proves the end-to-end Chat API integration without external LLM or RAG dependencies.
-    """
-    msg_lower = message.lower()
-    
-    if any(k in msg_lower for k in ("cramp", "period", "menstrual", "cycle", "bleed")):
-        guidance = (
-            "Menstrual cramps and cycle fluctuations are common experiences. "
-            "Gentle rest, adequate hydration, and a warm compress may offer comfort. "
-            "If you experience severe pain, unusually heavy bleeding, or dizziness, "
-            "please consult a qualified healthcare professional."
-        )
-    elif any(k in msg_lower for k in ("hygiene", "clean", "wash", "pad", "tampon", "cup")):
-        guidance = (
-            "Maintaining clean and dry intimate hygiene is important for your wellbeing. "
-            "Change menstrual products regularly (every 4-6 hours for pads) and wash with plain water, "
-            "avoiding harsh scented soaps."
-        )
-    elif any(k in msg_lower for k in ("stress", "anxiety", "anxious", "mood", "sad", "feel")):
-        guidance = (
-            "Emotional wellbeing and physical health are closely connected. "
-            "Taking deep breaths, getting adequate sleep, and speaking with someone you trust can help. "
-            "If emotional distress persists, professional support is always recommended."
-        )
-    else:
-        guidance = (
-            "I have received your message regarding women's health. "
-            "Sakhi is here to provide calm, trusted, and culturally sensitive educational guidance. "
-            "Feel free to ask more specific questions about periods, hygiene, or wellbeing."
-        )
-
-    return (
-        f"{guidance} "
-        f"[Sakhi Chat Service Response. Educational only; not medical advice.]"
-    )
 
 
 class ChatService:
@@ -91,8 +56,38 @@ class ChatService:
             content=message,
         )
 
-        # 3. Generate the temporary assistant response (Phase 2 controlled response)
-        reply_content = generate_temporary_response(message, conversation.preferred_language or target_language)
+        # 3. Gather Context and RAG evidence
+        context = None
+        rag_evidence = []
+        try:
+            with SessionLocal() as db:
+                builder = HealthContextBuilder(db, user_id)
+                context = builder.build_context(scopes=["LONGITUDINAL", "SYMPTOMS", "PROFILE"])
+                
+                from app.services.rag.retrieval import MedicalKnowledgeService
+                rag_service = MedicalKnowledgeService(db)
+                rag_evidence = rag_service.search(message, limit=3)
+        except Exception as e:
+            import logging
+            logging.error(f"Error fetching context/RAG: {e}")
+
+        # 4. Format Prompt and Generate Response
+        from app.services.ai_providers import get_provider
+        
+        system_prompt = "You are Sakhi, a compassionate women's health AI assistant. "
+        if context:
+            system_prompt += f"User context: {context.model_dump_json(exclude_none=True)}. "
+            
+        if rag_evidence:
+            system_prompt += "Here is some retrieved medical knowledge to use (cite it if relevant):\n"
+            for ev in rag_evidence:
+                system_prompt += f"- {ev.content} (Source: {ev.citation.source})\n"
+                
+        provider = get_provider()
+        reply_content = provider.generate_reply(
+            system_prompt=system_prompt,
+            conversation_history=[{"role": "user", "content": message}] # For a full implementation, we'd fetch actual history
+        )
 
         # 4. Persist the assistant message
         stored_assistant_msg = self._store.add_message(

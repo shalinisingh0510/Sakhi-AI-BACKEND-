@@ -15,6 +15,7 @@ from app.core.logging import configure_logging
 from app.core.middleware import (
     access_log_middleware,
     configure_rate_limiter,
+    global_exception_handler,
     rate_limit_middleware,
     request_size_middleware,
     security_headers_middleware,
@@ -174,6 +175,7 @@ def create_app(
         app.middleware("http")(request_size_middleware)
         app.middleware("http")(rate_limit_middleware)
         app.middleware("http")(access_log_middleware)
+        app.middleware("http")(global_exception_handler)
 
         app.include_router(api_router)
 
