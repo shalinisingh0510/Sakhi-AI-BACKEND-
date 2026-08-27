@@ -15,20 +15,31 @@ from app.models.health_profile import HealthCondition, HealthProfile
 from app.models.menstrual_cycle import CycleLog, MenstrualCycle
 from app.models.mood_log import MoodLog
 from app.models.nutrition import Food, FoodServingOption, NutritionLog, NutritionLogItem
+from app.models.rag import KnowledgeSource, KnowledgeDocument, DocumentChunk, TrustLevel, FreshnessStatus
 from app.models.symptom_log import SymptomLog
+from app.models.wellness_plan import WellnessGoal, WellnessPlan, PlanFrequency, PlanStatus
 
 # This ensures Alembic can discover all models when it imports Base
 __all__ = [
     "ActivityLog",
     "CycleLog",
+    "DocumentChunk",
     "EnergyLog",
     "Food",
     "FoodServingOption",
+    "FreshnessStatus",
     "HealthCondition",
     "HealthProfile",
+    "KnowledgeDocument",
+    "KnowledgeSource",
     "MenstrualCycle",
     "MoodLog",
     "NutritionLog",
     "NutritionLogItem",
     "SymptomLog",
+    "TrustLevel",
+    "WellnessGoal",
+    "WellnessPlan",
+    "PlanFrequency",
+    "PlanStatus",
 ]
