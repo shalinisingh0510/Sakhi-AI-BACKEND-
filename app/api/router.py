@@ -20,12 +20,14 @@ from app.api.v1.endpoints.nutrition import router as nutrition_router
 from app.api.v1.endpoints.activity import router as activity_router
 from app.api.v1.endpoints.energy import router as energy_router
 from app.api.v1.endpoints.wellness_longitudinal import router as wellness_longitudinal_router
+from app.api.v1.endpoints.wellness_plans import router as wellness_plans_router
 
 api_router = APIRouter()
 api_router.include_router(nutrition_router, prefix="/api/v1")
 api_router.include_router(activity_router, prefix="/api/v1")
 api_router.include_router(energy_router, prefix="/api/v1")
 api_router.include_router(wellness_longitudinal_router, prefix="/api/v1")
+api_router.include_router(wellness_plans_router, prefix="/api/v1")
 api_router.include_router(wellness_router, prefix="/api/v1")
 api_router.include_router(cycles_router, prefix="/api/v1")
 api_router.include_router(health_router, prefix="/api/v1")
