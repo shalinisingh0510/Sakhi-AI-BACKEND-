@@ -86,7 +86,7 @@ class WellnessDashboardService:
                 stats = self._cycle_service.get_statistics(user_id)
                 
                 if current_cycle.cycle_start_date:
-                    cycle_len = stats.average_cycle_length or 28
+                    cycle_len = int(stats.average_cycle_length or 28)
                     # Approximate estimates for dashboard view
                     next_period_estimate = current_cycle.cycle_start_date + timedelta(days=cycle_len)
                     if local_date <= next_period_estimate:
