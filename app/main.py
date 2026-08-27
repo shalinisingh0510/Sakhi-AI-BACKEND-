@@ -83,7 +83,7 @@ def create_app(
         db_pool = ConnectionPool(
             settings.database_url,
             kwargs={"connect_timeout": 10},
-            check=False,
+            check=ConnectionPool.check_connection,
         )
         app.state.db_pool = db_pool
 
