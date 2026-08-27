@@ -18,8 +18,10 @@ from app.models.nutrition import Food, FoodServingOption, NutritionLog, Nutritio
 from app.models.rag import KnowledgeSource, KnowledgeDocument, DocumentChunk, TrustLevel, FreshnessStatus
 from app.models.symptom_log import SymptomLog
 from app.models.symptom_log import SymptomLog
+from app.models.symptom_log import SymptomLog
 from app.models.wellness_plan import WellnessGoal, WellnessPlan, PlanFrequency, PlanStatus
 from app.models.integrations import HealthProviderConnection, ExternalSyncLog, ProviderType, ConnectionStatus, SyncStatus
+from app.models.ai_metrics import AIObservabilityLog, AIModelProvider
 
 # This ensures Alembic can discover all models when it imports Base
 __all__ = [
@@ -49,4 +51,6 @@ __all__ = [
     "ProviderType",
     "ConnectionStatus",
     "SyncStatus",
+    "AIObservabilityLog",
+    "AIModelProvider",
 ]
