@@ -10,6 +10,7 @@ from app.services.lessons import LessonService
 from app.services.notifications import NotificationService
 from app.services.progress import ProgressService
 from app.services.recommendations import RecommendationService
+from app.db.dependencies import get_db
 
 
 def get_auth_service(request: Request) -> AuthService:
@@ -92,3 +93,24 @@ def pagination_params(
     """Return (offset, limit) for use in list queries."""
     offset = (page - 1) * page_size
     return offset, page_size
+
+
+def verify_profile_ownership(profile_id: str, current_user: StoredUser = Depends(get_current_user), db=Depends(get_db)):
+    """
+    Dependency to verify that the requested HealthProfile ID actually belongs to the current user.
+    Prevents Insecure Direct Object Reference (IDOR) attacks.
+    """
+    from app.models.health_profile import HealthProfile
+    
+    # We could do a direct query here, but as a quick dependency we just check user ownership.
+    # We use db.query instead of importing a service to avoid circular deps.
+    profile = db.query(HealthProfile).filter(HealthProfile.id == profile_id).first()
+    
+    if not profile:
+        raise HTTPException(status_code=404, detail="Health profile not found")
+        
+    if profile.user_id != current_user.id:
+        # Phase 16: Return 404 instead of 403 to prevent data existence leakage (enumeration)
+        raise HTTPException(status_code=404, detail="Health profile not found")
+        
+    return profile
