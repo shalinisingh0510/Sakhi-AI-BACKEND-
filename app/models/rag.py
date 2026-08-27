@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from pgvector.sqlalchemy import Vector
 import enum
 
-from .base import Base
+from app.db.base import Base
 
 class TrustLevel(str, enum.Enum):
     PRIMARY_MEDICAL_GUIDELINE = "PRIMARY_MEDICAL_GUIDELINE"
@@ -75,6 +75,6 @@ class DocumentChunk(Base):
     
     # Metadata for citation and retrieval filtering
     heading: Mapped[Optional[str]] = mapped_column(String)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
+    chunk_metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
     
     document: Mapped["KnowledgeDocument"] = relationship("KnowledgeDocument", back_populates="chunks")
