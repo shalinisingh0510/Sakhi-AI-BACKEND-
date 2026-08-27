@@ -129,6 +129,7 @@ class HealthProfileService:
                 id=str(uuid4()),
                 user_id=authenticated_user_id,
                 date_of_birth=data.date_of_birth,
+                biological_sex=getattr(data, "biological_sex", None),
                 height_cm=data.height_cm,
                 weight_kg=data.weight_kg,
                 activity_level=data.activity_level.value,
@@ -187,6 +188,8 @@ class HealthProfileService:
                 profile.ai_health_personalization_enabled = (
                     data.ai_health_personalization_enabled
                 )
+            if hasattr(data, "biological_sex") and data.biological_sex is not None:
+                profile.biological_sex = data.biological_sex
 
         logger.info("health_profile.updated user=%s", authenticated_user_id)
         return self._to_response(profile)
@@ -269,6 +272,7 @@ class HealthProfileService:
             id=profile.id,
             user_id=profile.user_id,
             date_of_birth=profile.date_of_birth,
+            biological_sex=profile.biological_sex,
             height_cm=profile.height_cm,
             weight_kg=profile.weight_kg,
             activity_level=profile.activity_level,
