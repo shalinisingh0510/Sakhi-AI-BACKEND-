@@ -15,6 +15,23 @@ openai>=1.30,<2.0
 google-generativeai>=0.8.0,<1.0
 
 # Database ORM and migrations (Phase 0)
+# Core runtime dependencies
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+pydantic-settings>=2.6,<3.0
+python-dotenv>=1.0,<2.0
+psycopg[binary,pool]>=3.1,<4.0
+boto3>=1.34,<2.0
+
+# Production server
+gunicorn>=21.0,<23.0
+
+# Optional: enable AI providers
+# Uncomment the line below or install with: pip install "sakhi-ai-backend[ai]"
+openai>=1.30,<2.0
+google-generativeai>=0.8.0,<1.0
+
+# Database ORM and migrations (Phase 0)
 sqlalchemy>=2.0,<3.0
 alembic>=1.13,<2.0
 
@@ -23,3 +40,6 @@ celery[redis]>=5.3,<6.0
 
 # Vector database (Phase 10)
 pgvector>=0.2,<1.0
+
+# Image Processing (Phase 14)
+Pillow>=10.0,<11.0
