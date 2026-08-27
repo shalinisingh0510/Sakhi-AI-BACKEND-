@@ -178,6 +178,12 @@ class WellnessService:
                 symptom_resps.append(new_symptom)
 
             self._session.flush()
+            if mood_resp:
+                self._session.refresh(mood_resp)
+            if energy_resp:
+                self._session.refresh(energy_resp)
+            for s in symptom_resps:
+                self._session.refresh(s)
 
         logger.info(f"User {user_id} submitted daily check-in for {data.log_date}")
         
