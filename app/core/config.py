@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = Field(default=None)
     groq_api_key: SecretStr | None = Field(default=None)
     openai_model: str = "gpt-4o-mini"
+    sentry_dsn: str | None = Field(default=None)
     conversation_history_limit: int = 8
     secret_key: SecretStr = Field(
         default=SecretStr("dev-secret-change-me"),
