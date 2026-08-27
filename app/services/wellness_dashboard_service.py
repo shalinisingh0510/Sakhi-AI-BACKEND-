@@ -24,8 +24,13 @@ class WellnessDashboardService:
         self._cycle_repo = MenstrualCycleRepository(db)
 
     def get_dashboard(self, user_id: str, local_date: date) -> WellnessDashboardResponse:
-        profile = self._profile_service.get_profile(user_id)
-        is_complete = profile is not None
+        try:
+            profile = self._profile_service.get_profile(authenticated_user_id=user_id)
+            is_complete = True
+        except Exception:
+            profile = None
+            is_complete = False
+            
         mode = "teen" if (profile and profile.age_band == "teen") else "adult"
 
         if not is_complete:
