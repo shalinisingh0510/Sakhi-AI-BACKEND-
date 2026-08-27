@@ -93,7 +93,7 @@ class WellnessDashboardService:
                          cycle_snapshot.next_period = next_period_estimate
                          cycle_snapshot.ovulation = next_period_estimate - timedelta(days=14)
                     
-                    cycle_snapshot.confidence = "HIGH" if stats.total_cycles_tracked >= 3 else "LIMITED"
+                    cycle_snapshot.confidence = "HIGH" if stats.completed_cycles >= 3 else "LIMITED"
 
         # 3. Trends (Simplistic query for dashboard)
         # In a real heavy-load scenario we'd use optimized GROUP BY queries, but for Phase 4 python processing is fine.
