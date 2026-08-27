@@ -77,7 +77,7 @@ class WellnessService:
         # The prompt says: use centralised feature policy. If missing, we assume HealthHub availability = True.
         
         # We don't have SYMPTOM_TRACKING explicitly in the old phase 1 policy mock, so we just check basic access.
-        if not age_policy.can_use_health_hub():
+        if not age_policy.is_health_hub_allowed():
             raise HTTPException(403, "Health hub is restricted by age policy.")
 
         return profile
