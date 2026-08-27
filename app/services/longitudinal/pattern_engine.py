@@ -4,7 +4,7 @@ from typing import Sequence
 from collections import Counter
 from app.schemas.longitudinal import InsightConfidence, SymptomPattern
 from app.models.symptom_log import SymptomLog
-from app.models.menstrual_cycle import CycleLog
+from app.models.menstrual_cycle import MenstrualCycle
 
 class SymptomPatternEngine:
     
@@ -41,7 +41,7 @@ class SymptomPatternEngine:
         return patterns
 
     @staticmethod
-    def find_cycle_correlations(symptoms: Sequence[SymptomLog], cycle_logs: Sequence[CycleLog]) -> list[SymptomPattern]:
+    def find_cycle_correlations(symptoms: Sequence[SymptomLog], cycle_logs: Sequence[MenstrualCycle]) -> list[SymptomPattern]:
         """Identify symptoms that occur frequently on specific cycle days."""
         # For simplicity, we just check if symptoms occur frequently on days 1-5 (menses) vs others.
         # In a real implementation, this would look at the precise cycle day (e.g. log_date - cycle_start_date)

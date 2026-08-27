@@ -4,7 +4,7 @@ from sqlalchemy import String, Integer, DateTime, ForeignKey, Float, Enum, Boole
 from sqlalchemy.orm import Mapped, mapped_column
 import enum
 
-from .base import Base
+from app.db.base import Base
 
 class AIModelProvider(str, enum.Enum):
     GEMINI = "GEMINI"

@@ -1,12 +1,12 @@
 """Longitudinal Data Service to retrieve time-bounded datasets."""
 
 from datetime import date
-from typing import Sequence
+from typing import Sequence, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.health_profile import HealthProfile
-from app.models.menstrual_cycle import CycleLog
+from app.models.menstrual_cycle import MenstrualCycle
 from app.models.symptom_log import SymptomLog
 from app.models.mood_log import MoodLog
 from app.models.energy_log import EnergyLog
@@ -21,16 +21,20 @@ class LongitudinalDataService:
         stmt = select(HealthProfile.id).where(HealthProfile.user_id == user_id)
         return self.db.execute(stmt).scalar_one_or_none()
 
-    def get_cycle_history(self, user_id: str, start_date: date, end_date: date) -> Sequence[CycleLog]:
+    def get_user_profile(self, user_id: str) -> Optional[HealthProfile]:
+        return self.db.execute(select(HealthProfile).where(HealthProfile.user_id == user_id)).scalar_one_or_none()
+
+    def get_cycle_history(self, user_id: str, start_date: date, end_date: date) -> Sequence[MenstrualCycle]:
         profile_id = self._get_profile_id(user_id)
         if not profile_id:
             return []
         
-        stmt = select(CycleLog).where(
-            CycleLog.health_profile_id == profile_id,
-            CycleLog.log_date >= start_date,
-            CycleLog.log_date <= end_date
-        ).order_by(CycleLog.log_date.asc())
+        # Note: MenstrualCycle uses cycle_start_date instead of log_date
+        stmt = select(MenstrualCycle).where(
+            MenstrualCycle.health_profile_id == profile_id,
+            MenstrualCycle.cycle_start_date >= start_date,
+            MenstrualCycle.cycle_start_date <= end_date
+        ).order_by(MenstrualCycle.cycle_start_date.asc())
         
         return self.db.scalars(stmt).all()
 
@@ -45,7 +49,7 @@ class LongitudinalDataService:
             SymptomLog.log_date <= end_date
         ).order_by(SymptomLog.log_date.asc())
         
-        return self.db.scalars(stmt).all()
+        return self.db.execute(stmt).scalars().all()
 
     def get_mood_history(self, user_id: str, start_date: date, end_date: date) -> Sequence[MoodLog]:
         profile_id = self._get_profile_id(user_id)

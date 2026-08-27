@@ -5,7 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 import enum
 
-from .base import Base
+from app.db.base import Base
 
 class PlanFrequency(str, enum.Enum):
     DAILY = "DAILY"
