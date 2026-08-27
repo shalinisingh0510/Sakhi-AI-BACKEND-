@@ -5,6 +5,7 @@ from fastapi import Depends, Header, HTTPException, Query, Request, status
 from app.services.ai import AIService
 from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService, InvalidTokenError, StoredUser
+from app.services.chat import ChatService
 from app.services.feedback import FeedbackService
 from app.services.lessons import LessonService
 from app.services.notifications import NotificationService
@@ -19,6 +20,10 @@ def get_auth_service(request: Request) -> AuthService:
 
 def get_ai_service(request: Request) -> AIService:
     return request.app.state.ai_service
+
+
+def get_chat_service(request: Request) -> ChatService:
+    return request.app.state.chat_service
 
 
 def get_lesson_service(request: Request) -> LessonService:

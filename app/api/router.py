@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.analytics import router as analytics_router
 from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.chat import router as chat_router
 from app.api.v1.endpoints.conversations import router as conversations_router
 from app.api.v1.endpoints.feedback import router as feedback_router
 from app.api.v1.endpoints.health import router as health_router
@@ -39,6 +40,7 @@ api_router.include_router(insights_router, prefix="/api/v1")
 api_router.include_router(health_router, prefix="/api/v1")
 api_router.include_router(health_profile_router, prefix="/api/v1")
 api_router.include_router(auth_router, prefix="/api/v1")
+api_router.include_router(chat_router, prefix="/api/v1/chat")
 api_router.include_router(conversations_router, prefix="/api/v1")
 api_router.include_router(lessons_router, prefix="/api/v1")
 api_router.include_router(feedback_router, prefix="/api/v1")
