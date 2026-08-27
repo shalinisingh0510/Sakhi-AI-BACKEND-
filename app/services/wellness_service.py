@@ -154,6 +154,11 @@ class WellnessService:
                     self._energy_repo.add(new_energy)
                     energy_resp = new_energy
                     
+            # Process Gamification (XP/Streaks)
+            from app.services.gamification_service import GamificationService
+            gamification = GamificationService(self._session)
+            gamification.record_checkin(user_id, data.log_date)
+
             # Process Symptoms (delete old for this date and insert new, or just insert new)
             # Simplest flow: clear today's symptoms and add the new ones in the checkin.
             existing_symptoms = self._symptom_repo.list_by_profile_and_date(profile.id, data.log_date)
