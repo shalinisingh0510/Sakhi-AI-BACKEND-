@@ -20,7 +20,7 @@ from alembic import op
 
 # revision identifiers
 revision = "006"
-down_revision = "005"
+down_revision = "005_wellness_foreign_keys"
 branch_labels = None
 depends_on = None
 
