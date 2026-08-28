@@ -14,7 +14,7 @@ DEFAULT_LANGUAGE = "english"
 DEFAULT_TITLE = "Health guidance"
 
 from app.services.ai_context.context_builder import HealthContextBuilder, AIHealthContext
-from app.db.session import SessionLocal
+from app.db.session import get_session_factory
 
 
 
@@ -60,6 +60,7 @@ class ChatService:
         context = None
         rag_evidence = []
         try:
+            SessionLocal = get_session_factory()
             with SessionLocal() as db:
                 builder = HealthContextBuilder(db, user_id)
                 context = builder.build_context(scopes=["LONGITUDINAL", "SYMPTOMS", "PROFILE"])
