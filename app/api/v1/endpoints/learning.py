@@ -113,6 +113,29 @@ def get_learning_content(
 
 
 @router.get(
+    "/learning/{content_id}/related",
+    response_model=LearningContentListResponse,
+    summary="Get related learning content",
+)
+def get_related_learning_content(
+    content_id: str,
+    limit: int = Query(4, ge=1, le=10),
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningService = Depends(get_learning_service),
+) -> Any:
+    try:
+        items = service.get_related_content(content_id, limit=limit)
+        return {
+            "items": items,
+            "total": len(items),
+            "page": 1,
+            "page_size": limit,
+        }
+    except LearningContentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get(
     "/learning/{content_id}/progress",
     response_model=LearningProgressResponse,
     summary="Get user progress for a content item",

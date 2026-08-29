@@ -197,3 +197,4 @@ class LearningSummaryResponse(BaseModel):
     learning_minutes: int
     articles_read: int = 0
     videos_watched: int = 0
+    continue_learning: Optional[LearningContentResponse] = None
