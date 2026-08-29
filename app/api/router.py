@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+﻿from fastapi import APIRouter
 
 from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.analytics import router as analytics_router
 from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.chat import router as chat_router
 from app.api.v1.endpoints.conversations import router as conversations_router
 from app.api.v1.endpoints.feedback import router as feedback_router
 from app.api.v1.endpoints.health import router as health_router
@@ -26,27 +27,28 @@ from app.api.v1.endpoints.food_vision import router as food_vision_router
 from app.api.v1.endpoints.insights import router as insights_router
 
 api_router = APIRouter()
-api_router.include_router(nutrition_router, prefix="/api/v1")
-api_router.include_router(activity_router, prefix="/api/v1")
-api_router.include_router(energy_router, prefix="/api/v1")
-api_router.include_router(wellness_longitudinal_router, prefix="/api/v1")
-api_router.include_router(wellness_plans_router, prefix="/api/v1")
-api_router.include_router(wellness_router, prefix="/api/v1")
-api_router.include_router(cycles_router, prefix="/api/v1")
-api_router.include_router(integrations_router, prefix="/api/v1")
-api_router.include_router(food_vision_router, prefix="/api/v1")
-api_router.include_router(insights_router, prefix="/api/v1")
-api_router.include_router(health_router, prefix="/api/v1")
-api_router.include_router(health_profile_router, prefix="/api/v1")
-api_router.include_router(auth_router, prefix="/api/v1")
-api_router.include_router(conversations_router, prefix="/api/v1")
-api_router.include_router(lessons_router, prefix="/api/v1")
-api_router.include_router(feedback_router, prefix="/api/v1")
-api_router.include_router(openapi_router, prefix="/api/v1")
-api_router.include_router(recommendations_router, prefix="/api/v1")
-api_router.include_router(progress_router, prefix="/api/v1")
-api_router.include_router(notifications_router, prefix="/api/v1")
-api_router.include_router(analytics_router, prefix="/api/v1")
-api_router.include_router(admin_router, prefix="/api/v1")
-api_router.include_router(media_router, prefix="/api/v1")
-api_router.include_router(ws_router, prefix="/api/v1")
+api_router.include_router(nutrition_router, prefix='/api/v1')
+api_router.include_router(activity_router, prefix='/api/v1')
+api_router.include_router(energy_router, prefix='/api/v1')
+api_router.include_router(wellness_longitudinal_router, prefix='/api/v1')
+api_router.include_router(wellness_plans_router, prefix='/api/v1')
+api_router.include_router(wellness_router, prefix='/api/v1')
+api_router.include_router(cycles_router, prefix='/api/v1')
+api_router.include_router(integrations_router, prefix='/api/v1')
+api_router.include_router(food_vision_router, prefix='/api/v1')
+api_router.include_router(insights_router, prefix='/api/v1')
+api_router.include_router(health_router, prefix='/api/v1')
+api_router.include_router(health_profile_router, prefix='/api/v1')
+api_router.include_router(auth_router, prefix='/api/v1')
+api_router.include_router(chat_router, prefix='/api/v1')
+api_router.include_router(conversations_router, prefix='/api/v1')
+api_router.include_router(lessons_router, prefix='/api/v1')
+api_router.include_router(feedback_router, prefix='/api/v1')
+api_router.include_router(openapi_router, prefix='/api/v1')
+api_router.include_router(recommendations_router, prefix='/api/v1')
+api_router.include_router(progress_router, prefix='/api/v1')
+api_router.include_router(notifications_router, prefix='/api/v1')
+api_router.include_router(analytics_router, prefix='/api/v1')
+api_router.include_router(admin_router, prefix='/api/v1')
+api_router.include_router(media_router, prefix='/api/v1')
+api_router.include_router(ws_router, prefix='/api/v1')
