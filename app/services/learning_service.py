@@ -167,11 +167,31 @@ class LearningService:
             or 0
         )
 
+        # Fetch most recently accessed unfinished content
+        continue_learning_record = self._db.scalars(
+            select(LearningContent)
+            .join(LearningProgress, LearningContent.id == LearningProgress.content_id)
+            .where(
+                and_(
+                    LearningProgress.user_id == user_id,
+                    LearningProgress.completed.is_(False),
+                    LearningContent.status == "PUBLISHED"
+                )
+            )
+            .order_by(LearningProgress.last_accessed_at.desc())
+            .limit(1)
+        ).first()
+
+        continue_learning = None
+        if continue_learning_record:
+            continue_learning = self._resolve_urls(continue_learning_record)
+
         return {
             "completed_lessons": completed_count,
             "learning_minutes": watch_time // 60,
             "videos_watched": videos_watched,
             "articles_read": articles_read,
+            "continue_learning": continue_learning,
         }
 
     def update_progress(
@@ -209,6 +229,25 @@ class LearningService:
         self._db.commit()
         self._db.refresh(progress)
         return progress
+
+    # ------------------------------------------------------------------
+    # Public (user-facing) methods
+    # ------------------------------------------------------------------
+    def get_related_content(self, content_id: str, limit: int = 4) -> List[LearningContent]:
+        content = self.get_content(content_id)
+        if not content:
+            return []
+
+        query = select(LearningContent).where(
+            and_(
+                LearningContent.status == "PUBLISHED",
+                LearningContent.id != content_id,
+                LearningContent.category == content.category
+            )
+        ).order_by(LearningContent.created_at.desc()).limit(limit)
+
+        results = self._db.scalars(query).all()
+        return [self._resolve_urls(c) for c in results]
 
     # ------------------------------------------------------------------
     # Admin methods
