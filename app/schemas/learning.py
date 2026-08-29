@@ -147,6 +147,8 @@ class LearningContentResponse(BaseModel):
     media_url: Optional[str]
     media_file_id: Optional[str]
     thumbnail_file_id: Optional[str]
+    thumbnail_url: Optional[str] = None
+    media_file_url: Optional[str] = None
     body: Optional[List[Dict[str, Any]]]
     category: str
     tags: List[str]

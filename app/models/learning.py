@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import Index, String, Text, Integer, Boolean, DateTime, ForeignKey
+from sqlalchemy import Index, String, Text, Integer, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import text
@@ -55,6 +55,7 @@ def validate_content_combination(content_type: str, source_type: str) -> None:
 
 class LearningContent(Base):
     __tablename__ = "learning_content"
+    __allow_unmapped__ = True
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid4())
@@ -84,32 +85,37 @@ class LearningContent(Base):
 
     # Content classification
     category: Mapped[str] = mapped_column(String(50), nullable=False)
-    tags: Mapped[list] = mapped_column(
-        JSONB, nullable=False, server_default=text("'[]'::jsonb")
+    tags: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
     )
-    language: Mapped[str] = mapped_column(String(10), nullable=False, default="en")
+    language: Mapped[str] = mapped_column(String(10), default="en", server_default="en")
 
     # Authorship — references users table id (not FK-constrained to avoid cross-store issues)
-    author_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    author_id: Mapped[str] = mapped_column(String(36), nullable=False)
 
     # Status: DRAFT | PUBLISHED | ARCHIVED
     # Architecture is forward-compatible with PENDING_REVIEW | REJECTED for doctor workflow
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    status: Mapped[str] = mapped_column(String(20), default="DRAFT", nullable=False)
 
     # Optional extras
-    is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    duration_minutes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+        DateTime, default=datetime.utcnow, server_default=func.now()
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime,
+        default=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=datetime.utcnow,
     )
-    published_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Transient attributes for resolved URLs
+    thumbnail_url: str | None = None
+    media_file_url: str | None = None
 
     __table_args__ = (
         Index("ix_learning_content_status", "status"),

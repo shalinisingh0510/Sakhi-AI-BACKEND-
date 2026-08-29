@@ -40,8 +40,10 @@ from app.services.learning_service import LearningContentNotFoundError, Learning
 router = APIRouter(tags=["learning"])
 
 
-def get_learning_service(db: Session = Depends(get_db)) -> LearningService:
-    return LearningService(db)
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
+
+def get_learning_service(request: Request, db: Session = Depends(get_db)) -> LearningService:
+    return LearningService(db, storage_service=request.app.state.storage_service)
 
 
 # ---------------------------------------------------------------------------
