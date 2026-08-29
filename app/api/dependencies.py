@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from fastapi import Depends, Header, HTTPException, Query, Request, status
+﻿from fastapi import Depends, Header, HTTPException, Query, Request, status
 
 from app.services.ai import AIService
 from app.services.analytics import AnalyticsService
@@ -61,14 +59,14 @@ def get_current_user(
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authorization header.",
+            detail='Missing authorization header.',
         )
 
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not token.strip():
+    scheme, _, token = authorization.partition(' ')
+    if scheme.lower() != 'bearer' or not token.strip():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authorization header must use the Bearer scheme.",
+            detail='Authorization header must use the Bearer scheme.',
         )
 
     try:
@@ -84,7 +82,7 @@ def require_roles(*roles: str):
         if current_user.role.lower() not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to access this resource.",
+                detail='You do not have permission to access this resource.',
             )
         return current_user
 
@@ -92,8 +90,8 @@ def require_roles(*roles: str):
 
 
 def pagination_params(
-    page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
-    page_size: int = Query(default=20, ge=1, le=100, description="Items per page"),
+    page: int = Query(default=1, ge=1, description='Page number (1-indexed)'),
+    page_size: int = Query(default=20, ge=1, le=100, description='Items per page'),
 ) -> tuple[int, int]:
     """Return (offset, limit) for use in list queries."""
     offset = (page - 1) * page_size
@@ -106,16 +104,16 @@ def verify_profile_ownership(profile_id: str, current_user: StoredUser = Depends
     Prevents Insecure Direct Object Reference (IDOR) attacks.
     """
     from app.models.health_profile import HealthProfile
-    
+
     # We could do a direct query here, but as a quick dependency we just check user ownership.
     # We use db.query instead of importing a service to avoid circular deps.
     profile = db.query(HealthProfile).filter(HealthProfile.id == profile_id).first()
-    
+
     if not profile:
-        raise HTTPException(status_code=404, detail="Health profile not found")
-        
+        raise HTTPException(status_code=404, detail='Health profile not found')
+
     if profile.user_id != current_user.id:
         # Phase 16: Return 404 instead of 403 to prevent data existence leakage (enumeration)
-        raise HTTPException(status_code=404, detail="Health profile not found")
-        
+        raise HTTPException(status_code=404, detail='Health profile not found')
+
     return profile
