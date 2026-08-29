@@ -22,6 +22,7 @@ from app.models.integrations import HealthProviderConnection, ExternalSyncLog, P
 from app.models.ai_metrics import AIObservabilityLog, AIModelProvider
 from app.models.subscription import SubscriptionPlan, UserSubscription
 from app.models.gamification import UserGamification, UserBadge
+from app.models.learning import LearningContent, LearningProgress
 
 # This ensures Alembic can discover all models when it imports Base
 __all__ = [
@@ -56,4 +57,6 @@ __all__ = [
     "SyncStatus",
     "AIObservabilityLog",
     "AIModelProvider",
+    "LearningContent",
+    "LearningProgress",
 ]
