@@ -12,6 +12,7 @@ from app.models.learning import (
     VALID_COMBINATIONS,
     LearningContent,
     LearningProgress,
+    LearningBookmark,
     extract_youtube_id,
     validate_content_combination,
 )
@@ -186,13 +187,81 @@ class LearningService:
         if continue_learning_record:
             continue_learning = self._resolve_urls(continue_learning_record)
 
+        # Gamification logic
+        streak = {"current": 0, "longest": 0}
+        badges = []
+        try:
+            from app.services.gamification_service import GamificationService
+            from app.models.gamification import UserGamification, UserBadge
+            g_svc = GamificationService(self._db)
+            g = g_svc.get_user_gamification(user_id)
+            streak["current"] = g.current_streak
+            streak["longest"] = g.longest_streak
+            
+            user_badges = self._db.scalars(
+                select(UserBadge).where(UserBadge.user_id == user_id)
+            ).all()
+            badges = [{"key": b.badge_key, "earned_at": b.earned_at} for b in user_badges]
+        except Exception:
+            pass
+
         return {
             "completed_lessons": completed_count,
             "learning_minutes": watch_time // 60,
             "videos_watched": videos_watched,
             "articles_read": articles_read,
             "continue_learning": continue_learning,
+            "streak": streak,
+            "badges": badges,
         }
+
+    def get_learning_history(self, user_id: str, limit: int = 20, offset: int = 0) -> List[dict]:
+        query = (
+            select(LearningProgress, LearningContent)
+            .join(LearningContent, LearningContent.id == LearningProgress.content_id)
+            .where(LearningProgress.user_id == user_id)
+            .order_by(LearningProgress.last_accessed_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        results = self._db.execute(query).all()
+        history = []
+        for progress, content in results:
+            resolved_content = self._resolve_urls(content)
+            history.append({
+                "progress": progress,
+                "content": resolved_content,
+            })
+        return history
+
+    def toggle_bookmark(self, user_id: str, content_id: str) -> bool:
+        """Toggles a bookmark. Returns True if saved, False if unsaved."""
+        bookmark = self._db.scalar(
+            select(LearningBookmark).where(
+                and_(LearningBookmark.user_id == user_id, LearningBookmark.content_id == content_id)
+            )
+        )
+        if bookmark:
+            self._db.delete(bookmark)
+            self._db.commit()
+            return False
+        else:
+            new_bookmark = LearningBookmark(user_id=user_id, content_id=content_id)
+            self._db.add(new_bookmark)
+            self._db.commit()
+            return True
+
+    def get_bookmarks(self, user_id: str, limit: int = 20, offset: int = 0) -> List[LearningContent]:
+        query = (
+            select(LearningContent)
+            .join(LearningBookmark, LearningBookmark.content_id == LearningContent.id)
+            .where(LearningBookmark.user_id == user_id)
+            .order_by(LearningBookmark.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        results = self._db.scalars(query).all()
+        return [self._resolve_urls(c) for c in results]
 
     def update_progress(
         self,
@@ -212,6 +281,7 @@ class LearningService:
                 completed=completed,
                 watch_time_seconds=watch_time_seconds,
                 progress_percent=progress_percent,
+                view_count=1,
                 last_accessed_at=now,
                 completed_at=now if completed else None,
             )
@@ -224,10 +294,23 @@ class LearningService:
             if completed and not progress.completed:
                 progress.completed = True
                 progress.completed_at = now
+            
+            # Increment view count if it's been more than an hour since last access
+            if (now - progress.last_accessed_at).total_seconds() > 3600:
+                progress.view_count += 1
+                
             progress.last_accessed_at = now
 
         self._db.commit()
         self._db.refresh(progress)
+        
+        # Trigger gamification check-in for meaningful learning activity
+        try:
+            from app.services.gamification_service import GamificationService
+            GamificationService(self._db).record_checkin(user_id, now.date())
+        except Exception:
+            pass
+            
         return progress
 
     # ------------------------------------------------------------------

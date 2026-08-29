@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import Index, String, Text, Integer, Boolean, DateTime, ForeignKey, func
+from sqlalchemy import Index, String, Text, Integer, Boolean, DateTime, ForeignKey, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import text
@@ -140,6 +140,7 @@ class LearningProgress(Base):
     watch_time_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # 0-100 progress percentage
     progress_percent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    view_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     last_accessed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
@@ -156,4 +157,26 @@ class LearningProgress(Base):
 
     __table_args__ = (
         Index("ix_learning_progress_user_id", "user_id"),
+    )
+
+
+class LearningBookmark(Base):
+    __tablename__ = "learning_bookmarks"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("learning_content.id", ondelete="CASCADE"), nullable=False
+    )
+    
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_learning_bookmarks_user_id", "user_id"),
+        Index("ix_learning_bookmarks_content_id", "content_id"),
+        UniqueConstraint("user_id", "content_id", name="uq_user_content_bookmark"),
     )

@@ -33,6 +33,7 @@ from app.schemas.learning import (
     LearningProgressResponse,
     LearningProgressUpdate,
     LearningSummaryResponse,
+    LearningHistoryResponse,
 )
 from app.services.auth import StoredUser
 from app.services.learning_service import LearningContentNotFoundError, LearningService
@@ -94,6 +95,64 @@ def get_progress_summary(
     service: LearningService = Depends(get_learning_service),
 ) -> Any:
     return service.get_user_progress_summary(current_user.id)
+
+
+@router.get(
+    "/learning/history",
+    response_model=LearningHistoryResponse,
+    summary="Get user learning history",
+)
+def get_learning_history(
+    pagination: tuple[int, int] = Depends(pagination_params),
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningService = Depends(get_learning_service),
+) -> Any:
+    offset, limit = pagination
+    history = service.get_learning_history(current_user.id, limit=limit, offset=offset)
+    return {
+        "items": history,
+        "total": len(history), # Simplification, ideal is total count query
+        "page": (offset // limit) + 1,
+        "page_size": limit,
+    }
+
+
+@router.get(
+    "/learning/bookmarks",
+    response_model=LearningContentListResponse,
+    summary="Get user bookmarked learning content",
+)
+def get_learning_bookmarks(
+    pagination: tuple[int, int] = Depends(pagination_params),
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningService = Depends(get_learning_service),
+) -> Any:
+    offset, limit = pagination
+    items = service.get_bookmarks(current_user.id, limit=limit, offset=offset)
+    return {
+        "items": items,
+        "total": len(items), # Simplification
+        "page": (offset // limit) + 1,
+        "page_size": limit,
+    }
+
+
+@router.post(
+    "/learning/{content_id}/bookmark",
+    summary="Toggle bookmark for a learning content item",
+)
+def toggle_bookmark(
+    content_id: str,
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningService = Depends(get_learning_service),
+) -> Any:
+    try:
+        # Verify content exists
+        service.get_content(content_id)
+        saved = service.toggle_bookmark(current_user.id, content_id)
+        return {"saved": saved}
+    except LearningContentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.get(
