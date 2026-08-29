@@ -186,11 +186,20 @@ class LearningProgressResponse(BaseModel):
     completed: bool
     watch_time_seconds: int
     progress_percent: int
+    view_count: int = 0
     last_accessed_at: datetime
     completed_at: Optional[datetime]
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class StreakResponse(BaseModel):
+    current: int
+    longest: int
+
+class BadgeResponse(BaseModel):
+    key: str
+    earned_at: datetime
 
 class LearningSummaryResponse(BaseModel):
     completed_lessons: int
@@ -198,3 +207,15 @@ class LearningSummaryResponse(BaseModel):
     articles_read: int = 0
     videos_watched: int = 0
     continue_learning: Optional[LearningContentResponse] = None
+    streak: Optional[StreakResponse] = None
+    badges: List[BadgeResponse] = Field(default_factory=list)
+
+class LearningHistoryItemResponse(BaseModel):
+    progress: LearningProgressResponse
+    content: LearningContentResponse
+
+class LearningHistoryResponse(BaseModel):
+    items: List[LearningHistoryItemResponse]
+    total: int
+    page: int
+    page_size: int
