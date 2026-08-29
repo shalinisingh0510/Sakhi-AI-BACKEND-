@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
@@ -48,7 +48,7 @@ from app.services.recommendations import RecommendationService
 from app.services.storage import CloudflareStorageService
 
 configure_logging()
-startup_logger = logging.getLogger("sakhi.startup")
+startup_logger = logging.getLogger('sakhi.startup')
 
 
 def create_app(
@@ -62,7 +62,7 @@ def create_app(
         @asynccontextmanager
         async def lifespan(app: FastAPI):
             yield
-            if hasattr(app.state, "db_pool"):
+            if hasattr(app.state, 'db_pool'):
                 app.state.db_pool.close()
 
         openapi_tags = [
@@ -179,23 +179,23 @@ def create_app(
 
         app.include_router(api_router)
 
-        @app.get("/api/health", include_in_schema=False)
+        @app.get('/api/health', include_in_schema=False)
         def lightweight_health_check() -> dict[str, str]:
-            return {"status": "ok"}
+            return {'status': 'ok'}
 
-        @app.get("/", include_in_schema=False)
+        @app.get('/', include_in_schema=False)
         def root() -> dict[str, str]:
             return {
-                "message": "Sakhi AI API is running",
-                "status": "ok",
+                'message': 'Sakhi AI API is running',
+                'status': 'ok',
             }
 
         setup_telemetry(app)
 
         return app
     except Exception as exc:
-        startup_logger.exception("Failed to initialize Sakhi AI backend services.")
-        raise RuntimeError("Sakhi AI backend failed to start during initialization.") from exc
+        startup_logger.exception('Failed to initialize Sakhi AI backend services.')
+        raise RuntimeError('Sakhi AI backend failed to start during initialization.') from exc
 
 
 app = create_app()

@@ -1,12 +1,15 @@
 from datetime import datetime
 from typing import Optional, List
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Boolean, Enum, Float
+from sqlalchemy import String, Integer, DateTime, ForeignKey, Boolean, Enum, Float, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from pgvector.sqlalchemy import Vector
 import enum
 
 from app.db.base import Base
+
+JSON_TYPE = JSON().with_variant(JSONB, "postgresql")
+
 
 class TrustLevel(str, enum.Enum):
     PRIMARY_MEDICAL_GUIDELINE = "PRIMARY_MEDICAL_GUIDELINE"
@@ -15,11 +18,13 @@ class TrustLevel(str, enum.Enum):
     PEER_REVIEWED_RESEARCH = "PEER_REVIEWED_RESEARCH"
     REFERENCE_MEDICAL_SOURCE = "REFERENCE_MEDICAL_SOURCE"
 
+
 class FreshnessStatus(str, enum.Enum):
     CURRENT = "CURRENT"
     AGING = "AGING"
     OUTDATED = "OUTDATED"
     SUPERSEDED = "SUPERSEDED"
+
 
 class KnowledgeSource(Base):
     """
@@ -40,6 +45,7 @@ class KnowledgeSource(Base):
 
     documents: Mapped[List["KnowledgeDocument"]] = relationship("KnowledgeDocument", back_populates="source")
 
+
 class KnowledgeDocument(Base):
     """
     A document/article ingested from a KnowledgeSource.
@@ -50,7 +56,7 @@ class KnowledgeDocument(Base):
     source_id: Mapped[str] = mapped_column(ForeignKey("knowledge_sources.id"), nullable=False)
     title: Mapped[str] = mapped_column(String, nullable=False)
     url: Mapped[Optional[str]] = mapped_column(String)
-    domain_topic: Mapped[Optional[str]] = mapped_column(String)  # e.g., MENSTRUAL_HEALTH
+    domain_topic: Mapped[Optional[str]] = mapped_column(String)  # e.g., menstrual_health
     version: Mapped[str] = mapped_column(String, default="v1")
     freshness: Mapped[FreshnessStatus] = mapped_column(Enum(FreshnessStatus), default=FreshnessStatus.CURRENT)
     
@@ -59,6 +65,7 @@ class KnowledgeDocument(Base):
     
     source: Mapped["KnowledgeSource"] = relationship("KnowledgeSource", back_populates="documents")
     chunks: Mapped[List["DocumentChunk"]] = relationship("DocumentChunk", back_populates="document")
+
 
 class DocumentChunk(Base):
     """
@@ -71,10 +78,10 @@ class DocumentChunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     
     content: Mapped[str] = mapped_column(String, nullable=False)
-    embedding: Mapped[Vector] = mapped_column(Vector(768))  # Gemini uses 768 dimensions
+    embedding: Mapped[Vector] = mapped_column(Vector(768))  # 768 dimensions
     
     # Metadata for citation and retrieval filtering
     heading: Mapped[Optional[str]] = mapped_column(String)
-    chunk_metadata: Mapped[Optional[dict]] = mapped_column(JSONB)
+    chunk_metadata: Mapped[Optional[dict]] = mapped_column(JSON_TYPE)
     
     document: Mapped["KnowledgeDocument"] = relationship("KnowledgeDocument", back_populates="chunks")
