@@ -25,9 +25,45 @@ class InvalidContentError(ValueError):
     pass
 
 
+from app.services.storage import StorageServiceProtocol
+
 class LearningService:
-    def __init__(self, db: Session) -> None:
+    def __init__(self, db: Session, storage_service: Optional[StorageServiceProtocol] = None) -> None:
         self._db = db
+        self._storage_service = storage_service
+
+    def _resolve_urls(self, content: LearningContent) -> LearningContent:
+        """Inject resolved presigned URLs if a storage service is available."""
+        if not self._storage_service:
+            return content
+
+        if content.thumbnail_file_id:
+            try:
+                content.thumbnail_url = self._storage_service.generate_presigned_download_url(
+                    content.thumbnail_file_id
+                )
+            except Exception:
+                pass  # Silently fail if storage is down
+
+        if content.media_file_id:
+            try:
+                content.media_file_url = self._storage_service.generate_presigned_download_url(
+                    content.media_file_id
+                )
+            except Exception:
+                pass
+
+        if content.body:
+            for block in content.body:
+                if block.get("media_file_id"):
+                    try:
+                        block["url"] = self._storage_service.generate_presigned_download_url(
+                            block["media_file_id"]
+                        )
+                    except Exception:
+                        pass
+
+        return content
 
     # ------------------------------------------------------------------
     # Public (user-facing) methods
@@ -63,7 +99,7 @@ class LearningService:
 
         query = query.order_by(LearningContent.created_at.desc()).offset(offset).limit(limit)
         results = self._db.scalars(query).all()
-        return list(results), total_count
+        return [self._resolve_urls(c) for c in results], total_count
 
     def get_content(self, content_id: str, admin: bool = False) -> LearningContent:
         """Fetch a content item.  By default only PUBLISHED content is visible.
@@ -73,7 +109,7 @@ class LearningService:
             raise LearningContentNotFoundError(f"Content '{content_id}' not found.")
         if not admin and content.status != "PUBLISHED":
             raise LearningContentNotFoundError(f"Content '{content_id}' not found.")
-        return content
+        return self._resolve_urls(content)
 
     def get_progress(self, user_id: str, content_id: str) -> Optional[LearningProgress]:
         return self._db.get(LearningProgress, (user_id, content_id))
@@ -202,7 +238,7 @@ class LearningService:
         ) or 0
         query = query.order_by(LearningContent.created_at.desc()).offset(offset).limit(limit)
         results = self._db.scalars(query).all()
-        return list(results), total_count
+        return [self._resolve_urls(c) for c in results], total_count
 
     def create_content(self, author_id: str, data: dict) -> LearningContent:
         validate_content_combination(data["content_type"], data["source_type"])
