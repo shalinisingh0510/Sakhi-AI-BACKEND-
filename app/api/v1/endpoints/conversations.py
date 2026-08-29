@@ -101,13 +101,24 @@ def send_message(
         context_obj = HealthContextBuilder(db, current_user.id).build_context(intent_result.required_scopes)
         health_context_dict = context_obj.model_dump() if context_obj else None
 
-    # 5. Gather Medical Knowledge (Phase 10 RAG)
+    # 5. Gather Medical Knowledge (Phase 10 RAG + Phase 13 Advanced RAG)
     rag_evidence = []
     if intent_result.category in (IntentCategory.GENERAL_KNOWLEDGE, IntentCategory.COMBINED):
         knowledge_service = MedicalKnowledgeService(db)
+        # Fetch conversation history for query understanding context
+        try:
+            conversation = ai_service._require_owned_conversation(user_id=current_user.id, conversation_id=conversation_id)
+            messages = [{"role": msg.role, "content": msg.content} for msg in ai_service._store.get_messages(conversation_id)]
+        except ConversationNotFoundError:
+            messages = []
+            
         for q in intent_result.search_queries:
-            evidence = knowledge_service.search(query=q, limit=3)
-            rag_evidence.extend([e.model_dump() for e in evidence])
+            evidence = knowledge_service.search(query=q, limit=3, history=messages)
+            
+            if evidence.compressed_evidence:
+                rag_evidence.extend([e.model_dump() for e in evidence.compressed_evidence])
+            else:
+                rag_evidence.extend([e.model_dump() for e in evidence.matched_chunks])
             
     # Combine context for AI Service
     combined_context = {

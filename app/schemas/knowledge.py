@@ -102,5 +102,30 @@ class RetrievalResult(BaseModel):
     """Full result of knowledge retrieval for a user query."""
     query: str
     matched_chunks: List[RetrievedChunk] = Field(default_factory=list)
+    compressed_evidence: List[CompressedEvidence] = Field(default_factory=list)
     has_sufficient_context: bool = True
     status: str = "SUCCESS"  # "SUCCESS", "INSUFFICIENT_CONTEXT", "OUT_OF_SCOPE"
+
+
+class SearchQuery(BaseModel):
+    """Represents a specific search perspective/query."""
+    query: str
+    is_hyde: bool = False
+    is_keyword: bool = False
+
+
+class QueryUnderstandingResult(BaseModel):
+    """Result of analyzing and rewriting a user query."""
+    original_query: str
+    rewritten_query: str
+    search_queries: List[SearchQuery]
+    medical_terms_normalized: dict[str, str] = Field(default_factory=dict)
+
+
+class CompressedEvidence(BaseModel):
+    """Distilled knowledge statements preserving provenance."""
+    statement: str
+    citations: List[Citation]
+    is_conflicting: bool = False
+    conflict_note: Optional[str] = None
+
