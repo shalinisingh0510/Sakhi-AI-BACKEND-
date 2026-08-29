@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: sakhi-ai-backend
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "bash scripts/start_production.sh"
+    envVars:
+      - key: SAKHI_ENVIRONMENT
+        value: production
+      - key: SAKHI_DATABASE_PATH
+        value: /var/lib/sakhi-ai/production.sqlite3
+      - key: SAKHI_REDIS_URL
+        value: redis://red-xxxxxxxxxxxxxxxxxxxx:6379
+      - key: SAKHI_OPENAI_API_KEY
+        sync: false
+      - key: SAKHI_SECRET_KEY
+        sync: false
+      - key: SAKHI_SENTRY_DSN
+        sync: false
+      - key: SAKHI_CORS_ORIGINS
+        value: "https://sakhi-ai-frontend-delta.vercel.app"
+    healthCheckPath: "/api/v1/health"
+    disk:
+      name: sakhi-data
+      mountPath: /var/lib/sakhi-ai
+      sizeGB: 1

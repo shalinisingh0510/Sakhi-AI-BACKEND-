@@ -24,8 +24,13 @@ class WellnessDashboardService:
         self._cycle_repo = MenstrualCycleRepository(db)
 
     def get_dashboard(self, user_id: str, local_date: date) -> WellnessDashboardResponse:
-        profile = self._profile_service.get_profile(user_id)
-        is_complete = profile is not None
+        try:
+            profile = self._profile_service.get_profile(authenticated_user_id=user_id)
+            is_complete = True
+        except Exception:
+            profile = None
+            is_complete = False
+            
         mode = "teen" if (profile and profile.age_band == "teen") else "adult"
 
         if not is_complete:
@@ -81,14 +86,14 @@ class WellnessDashboardService:
                 stats = self._cycle_service.get_statistics(user_id)
                 
                 if current_cycle.cycle_start_date:
-                    cycle_len = stats.average_cycle_length or 28
+                    cycle_len = int(stats.average_cycle_length or 28)
                     # Approximate estimates for dashboard view
                     next_period_estimate = current_cycle.cycle_start_date + timedelta(days=cycle_len)
                     if local_date <= next_period_estimate:
                          cycle_snapshot.next_period = next_period_estimate
                          cycle_snapshot.ovulation = next_period_estimate - timedelta(days=14)
                     
-                    cycle_snapshot.confidence = "HIGH" if stats.total_cycles_tracked >= 3 else "LIMITED"
+                    cycle_snapshot.confidence = "HIGH" if stats.completed_cycles >= 3 else "LIMITED"
 
         # 3. Trends (Simplistic query for dashboard)
         # In a real heavy-load scenario we'd use optimized GROUP BY queries, but for Phase 4 python processing is fine.

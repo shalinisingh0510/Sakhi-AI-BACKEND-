@@ -20,10 +20,16 @@ from app.models.symptom_log import SymptomLog
 from app.models.wellness_plan import WellnessGoal, WellnessPlan, PlanFrequency, PlanStatus
 from app.models.integrations import HealthProviderConnection, ExternalSyncLog, ProviderType, ConnectionStatus, SyncStatus
 from app.models.ai_metrics import AIObservabilityLog, AIModelProvider
+from app.models.subscription import SubscriptionPlan, UserSubscription
+from app.models.gamification import UserGamification, UserBadge
 
 # This ensures Alembic can discover all models when it imports Base
 __all__ = [
     "ActivityLog",
+    "SubscriptionPlan",
+    "UserSubscription",
+    "UserGamification",
+    "UserBadge",
     "DocumentChunk",
     "EnergyLog",
     "Food",
