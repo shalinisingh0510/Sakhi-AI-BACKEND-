@@ -45,9 +45,9 @@ class LongitudinalDataService:
             
         stmt = select(SymptomLog).where(
             SymptomLog.health_profile_id == profile_id,
-            SymptomLog.log_date >= start_date,
-            SymptomLog.log_date <= end_date
-        ).order_by(SymptomLog.log_date.asc())
+            SymptomLog.start_date >= start_date,
+            SymptomLog.start_date <= end_date
+        ).order_by(SymptomLog.start_date.asc())
         
         return self.db.execute(stmt).scalars().all()
 

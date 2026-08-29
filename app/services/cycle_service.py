@@ -96,7 +96,9 @@ class CycleService:
                 detail="Health profile required to use the cycle tracker.",
             )
 
-        gate = HealthPrivacyGate.from_profile(profile)
+        gate = HealthPrivacyGate.from_profile(
+            authenticated_user_id=user_id, profile=profile
+        )
         gate.assert_owner(user_id)
 
         age_policy = AgePolicy.from_dob(profile.date_of_birth)
