@@ -95,6 +95,72 @@ class AIService:
         self._store = store
         self._provider: AIProviderProtocol = provider or build_ai_provider(settings)
 
+    def _generate_orchestrated_reply(
+        self,
+        user_message: str,
+        conversation_title: str,
+        preferred_language: str,
+        history: list[dict[str, str]],
+        mode: str = "text",
+        health_context: dict | None = None,
+    ) -> str:
+        from app.services.ai_orchestration.safety import HealthSafetyRouter, HealthAIResponseGuard, SafetyRiskLevel
+        from app.services.rag.retrieval import MedicalKnowledgeService
+        from app.services.ai_orchestration.context_builder import ContextBuilder
+        from app.db.session import SessionLocal
+
+        router = HealthSafetyRouter()
+        
+        # 1. Pre-generation validation
+        # We assume age 25 if not provided in health_context, ideally extracted from it.
+        user_age = 25
+        if health_context and "age" in health_context:
+            try:
+                user_age = int(health_context["age"])
+            except ValueError:
+                pass
+
+        safety_result = router.validate_pre_generation(user_message, user_age)
+        if not safety_result.is_safe:
+            return safety_result.override_message
+
+        # 2. RAG Retrieval
+        retrieved_context = None
+        try:
+            db = SessionLocal()
+            try:
+                rag_service = MedicalKnowledgeService(db=db)
+                retrieval_result = rag_service.search(query=user_message, history=[])
+                if retrieval_result.matched_chunks:
+                    retrieved_context = ContextBuilder.build_context(
+                        chunks=retrieval_result.matched_chunks,
+                        compressed_evidence=retrieval_result.synthesized_facts
+                    )
+            finally:
+                db.close()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"RAG search failed: {e}")
+
+        # 3. LLM Generation
+        reply_text = self._provider.generate_reply(
+            user_message=user_message,
+            conversation_title=conversation_title,
+            preferred_language=preferred_language,
+            history=history,
+            mode=mode,
+            health_context=health_context,
+            retrieved_context=retrieved_context
+        )
+
+        # 4. Post-generation validation
+        guard = HealthAIResponseGuard()
+        if not guard.validate_post_generation(reply_text):
+            return "I apologize, but I am unable to provide a safe response to that question. Please consult a healthcare professional for medical advice."
+
+        return reply_text
+
     def create_conversation(
         self,
         *,
@@ -113,17 +179,20 @@ class AIService:
             preferred_language=language,
         )
         self._store.add_message(conversation_id=conversation.id, role="user", content=initial_message)
+        
+        reply_text = self._generate_orchestrated_reply(
+            user_message=initial_message,
+            conversation_title=conversation.title,
+            preferred_language=conversation.preferred_language,
+            history=[],
+            mode=mode,
+            health_context=health_context
+        )
+        
         self._store.add_message(
             conversation_id=conversation.id,
             role="assistant",
-            content=self._provider.generate_reply(
-                user_message=initial_message,
-                conversation_title=conversation.title,
-                preferred_language=conversation.preferred_language,
-                history=[],
-                mode=mode,
-                health_context=health_context,
-            ),
+            content=reply_text,
         )
         return self.get_conversation(user_id=user_id, conversation_id=conversation.id)
 
@@ -148,14 +217,16 @@ class AIService:
         self._store.add_message(conversation_id=conversation.id, role="user", content=message)
         # Build recent history for context-aware replies (respects history limit)
         history = self._build_history(conversation_id=conversation.id, exclude_last_n=1)
-        reply_text = self._provider.generate_reply(
+        
+        reply_text = self._generate_orchestrated_reply(
             user_message=message,
             conversation_title=conversation.title,
             preferred_language=conversation.preferred_language,
             history=history,
             mode=mode,
-            health_context=health_context,
+            health_context=health_context
         )
+        
         self._store.add_message(conversation_id=conversation.id, role="assistant", content=reply_text)
         return self.get_conversation(user_id=user_id, conversation_id=conversation.id)
 

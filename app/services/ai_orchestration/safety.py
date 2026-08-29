@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 class SafetyRiskLevel(str, enum.Enum):
     SAFE = "SAFE"
+    OUT_OF_SCOPE = "OUT_OF_SCOPE"
     LOW_RISK_HEALTH = "LOW_RISK_HEALTH"
     HIGH_RISK_MEDICAL = "HIGH_RISK_MEDICAL"
     URGENT_EMERGENCY = "URGENT_EMERGENCY"
@@ -20,9 +21,20 @@ class HealthSafetyRouter:
     Evaluates queries and responses to enforce medical boundaries.
     """
     
-    def validate_pre_generation(self, query: str, user_age: int) -> SafetyValidationResult:
+    def validate_pre_generation(self, query: str, user_age: int = 25) -> SafetyValidationResult:
         query_lower = query.lower()
         
+        # 0. Out of Scope Detection
+        out_of_scope_keywords = ["python", "java", "code", "programming", "blockchain", "cricket", "football", "joke"]
+        if any(w in query_lower.split() for w in out_of_scope_keywords):
+            # Only trigger if it strongly looks like out of scope, a better classifier is needed in prod
+            return SafetyValidationResult(
+                is_safe=False,
+                risk_level=SafetyRiskLevel.OUT_OF_SCOPE,
+                reason="Query appears to be out of the women's health scope.",
+                override_message="I'm Sakhi, a women's health assistant. I can't answer general or unrelated questions like that, but I'm here if you want to talk about health, wellness, or your body."
+            )
+
         # 1. Emergency Detection
         emergency_keywords = ["suicide", "kill myself", "heart attack", "stroke", "bleeding out", "can't breathe"]
         if any(w in query_lower for w in emergency_keywords):
@@ -70,7 +82,9 @@ class HealthAIResponseGuard:
             "i diagnose you",
             "you should take",
             "this means you have",
-            "stop taking your medication"
+            "stop taking your medication",
+            "ignore previous instructions",
+            "system prompt"
         ]
         
         if any(phrase in text_lower for phrase in forbidden_phrases):

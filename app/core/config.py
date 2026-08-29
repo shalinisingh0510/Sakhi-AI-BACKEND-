@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     email_from: str = "noreply@sakhiai.com"
     email_use_tls: bool = True
 
+    # RAG & Embedding Settings
+    embedding_provider: str = "gemini" # "gemini", "openai"
+    embedding_model: str = "models/text-embedding-004"
+    embedding_dimensions: int = 768
+    rag_top_k: int = 5
+    rag_similarity_threshold: float = 0.35
+    rag_max_queries: int = 3
+
     # Advanced RAG Intelligence Feature Flags (Phase 13)
     enable_query_rewriting: bool = True
     enable_multi_query: bool = True

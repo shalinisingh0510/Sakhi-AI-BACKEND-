@@ -133,9 +133,14 @@ class MedicalKnowledgeService:
                 status="INSUFFICIENT_CONTEXT",
             )
 
-        # 5. Multi-Query Scoring & Fusion
-        chunk_scores: Dict[str, RetrievedChunk] = {}
+        # 5. Semantic Scoring & Keyword Scoring
+        semantic_scores: Dict[str, float] = {}
+        keyword_scores: Dict[str, float] = {}
+        chunk_metadata: Dict[str, RetrievedChunk] = {}
         
+        # Simple keyword extraction (words > 4 chars)
+        keywords = [w.lower() for w in self.preprocess_query(understanding_result.rewritten_query).split() if len(w) > 4]
+
         for chunk, doc, source in candidates:
             emb = chunk.embedding
             if hasattr(emb, "tolist"):
@@ -143,61 +148,91 @@ class MedicalKnowledgeService:
             elif not isinstance(emb, list):
                 emb = list(emb)
 
-            # Get max score across all queries for this chunk
+            # Max semantic score
             max_score = 0.0
             for q_emb in query_embeddings:
                 score = cosine_similarity(q_emb, emb)
                 if score > max_score:
                     max_score = score
-                    
-            # Freshness & Authority Ranking Adjustments (Phase 13)
-            adjusted_score = max_score
+            semantic_scores[chunk.id] = max_score
+
+            # Keyword score (TF-ish approach)
+            kw_score = 0.0
+            chunk_content_lower = chunk.content.lower()
+            for kw in keywords:
+                if kw in chunk_content_lower:
+                    kw_score += 1.0
+            keyword_scores[chunk.id] = kw_score
+
+            # Initialize chunk metadata
+            confidence = "HIGH" if source.trust_level in (TrustLevel.PRIMARY_MEDICAL_GUIDELINE, TrustLevel.GOVERNMENT_HEALTH) and max_score > 0.60 else "MEDIUM"
+            tier = (
+                SourceTier.TIER_1_PRIMARY_AUTHORITY
+                if source.trust_level in (TrustLevel.PRIMARY_MEDICAL_GUIDELINE, TrustLevel.GOVERNMENT_HEALTH)
+                else SourceTier.TIER_2_TRUSTED_EDUCATIONAL
+            )
+            citation = Citation(
+                source_name=source.name,
+                organization=source.organization,
+                tier=tier,
+                title=doc.title,
+                url=doc.url,
+                section=chunk.heading,
+                publication_date=doc.publication_date.isoformat() if doc.publication_date else None,
+            )
+            try:
+                topic_enum = DomainTopic(doc.domain_topic)
+            except ValueError:
+                topic_enum = DomainTopic.MENSTRUAL_HEALTH
+
+            chunk_metadata[chunk.id] = RetrievedChunk(
+                content=chunk.content,
+                similarity_score=max_score, # Will be overwritten by fusion score
+                confidence=confidence,
+                citation=citation,
+                topic=topic_enum,
+                chunk_id=chunk.id,
+                document_id=doc.id,
+            )
+
+        # 6. Reciprocal Rank Fusion (RRF) & Thresholding
+        # Rank semantically
+        ranked_semantic = sorted(semantic_scores.keys(), key=lambda cid: semantic_scores[cid], reverse=True)
+        # Rank by keyword
+        ranked_keyword = sorted(keyword_scores.keys(), key=lambda cid: keyword_scores[cid], reverse=True)
+
+        k_rrf = 60
+        fusion_scores: Dict[str, float] = {}
+        for cid in semantic_scores.keys():
+            s_rank = ranked_semantic.index(cid) + 1 if semantic_scores[cid] >= min_thresh else 1000
+            k_rank = ranked_keyword.index(cid) + 1 if keyword_scores[cid] > 0 else 1000
+            
+            # If it doesn't pass semantic threshold and has no keyword match, discard
+            if s_rank == 1000 and k_rank == 1000:
+                continue
+
+            rrf_score = (1.0 / (k_rrf + s_rank)) + (1.0 / (k_rrf + k_rank))
+            
+            # Freshness adjustments
+            doc = next(d for c, d, s in candidates if c.id == cid)
+            source = next(s for c, d, s in candidates if c.id == cid)
             if self.settings.enable_freshness_ranking:
-                # Boost Tier 1
                 if source.trust_level in (TrustLevel.PRIMARY_MEDICAL_GUIDELINE, TrustLevel.GOVERNMENT_HEALTH):
-                    adjusted_score += 0.02
-                # Penalize aging docs
+                    rrf_score += 0.005
                 if doc.freshness == FreshnessStatus.AGING:
-                    adjusted_score -= 0.02
+                    rrf_score -= 0.005
                 elif doc.freshness == FreshnessStatus.OUTDATED:
-                    adjusted_score -= 0.05
-                    
-            if adjusted_score >= min_thresh:
-                confidence = "HIGH" if source.trust_level in (TrustLevel.PRIMARY_MEDICAL_GUIDELINE, TrustLevel.GOVERNMENT_HEALTH) and adjusted_score > 0.60 else "MEDIUM"
-                
-                tier = (
-                    SourceTier.TIER_1_PRIMARY_AUTHORITY
-                    if source.trust_level in (TrustLevel.PRIMARY_MEDICAL_GUIDELINE, TrustLevel.GOVERNMENT_HEALTH)
-                    else SourceTier.TIER_2_TRUSTED_EDUCATIONAL
-                )
+                    rrf_score -= 0.01
 
-                citation = Citation(
-                    source_name=source.name,
-                    organization=source.organization,
-                    tier=tier,
-                    title=doc.title,
-                    url=doc.url,
-                    section=chunk.heading,
-                    publication_date=doc.publication_date.isoformat() if doc.publication_date else None,
-                )
+            fusion_scores[cid] = rrf_score
 
-                try:
-                    topic_enum = DomainTopic(doc.domain_topic)
-                except ValueError:
-                    topic_enum = DomainTopic.MENSTRUAL_HEALTH
+        # Select Top K from fused
+        scored_chunks = []
+        for cid, f_score in fusion_scores.items():
+            meta = chunk_metadata[cid]
+            meta.similarity_score = round(f_score, 4)
+            scored_chunks.append(meta)
 
-                chunk_scores[chunk.id] = RetrievedChunk(
-                    content=chunk.content,
-                    similarity_score=round(adjusted_score, 4),
-                    confidence=confidence,
-                    citation=citation,
-                    topic=topic_enum,
-                    chunk_id=chunk.id,
-                    document_id=doc.id,
-                )
-
-        # 6. Sort by similarity descending and select Top K
-        scored_chunks = list(chunk_scores.values())
         scored_chunks.sort(key=lambda x: x.similarity_score, reverse=True)
         top_matches = scored_chunks[:k]
 

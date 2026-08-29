@@ -57,16 +57,13 @@ class GeminiEmbeddingProvider:
     """
     dimension = 768
 
-    def __init__(self, api_key: str | None = None, model_name: str = "models/text-embedding-004"):
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        if not self.api_key:
-            logger.warning("GEMINI_API_KEY is not set. Gemini embeddings may fail if called without key.")
-        else:
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=self.api_key)
-            except ImportError:
-                logger.warning("google-generativeai is not installed.")
+    def __init__(self, api_key: str, model_name: str = "models/text-embedding-004"):
+        self.api_key = api_key
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=self.api_key)
+        except ImportError:
+            logger.warning("google-generativeai is not installed.")
         self.model_name = model_name
 
     def embed_text(self, text: str) -> List[float]:
@@ -90,21 +87,52 @@ class GeminiEmbeddingProvider:
         return response["embedding"]
 
 
-def get_embedding_provider(provider_type: str | None = None) -> EmbeddingProvider:
+class OpenAIEmbeddingProvider:
     """
-    Factory to return the configured embedding provider.
-    Falls back to MockEmbeddingProvider if no API key is present.
+    Implementation of EmbeddingProvider using OpenAI API.
     """
-    forced_type = (provider_type or os.getenv("EMBEDDING_PROVIDER", "")).lower()
-
-    if forced_type == "mock":
-        return MockEmbeddingProvider()
-
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if gemini_key:
+    def __init__(self, api_key: str, model_name: str = "text-embedding-3-small", dimension: int = 1536):
+        self.api_key = api_key
+        self.model_name = model_name
+        self.dimension = dimension
         try:
-            return GeminiEmbeddingProvider(api_key=gemini_key)
-        except Exception as e:
-            logger.warning(f"Failed to initialize GeminiEmbeddingProvider ({e}), falling back to mock.")
+            from openai import OpenAI
+            self.client = OpenAI(api_key=api_key)
+        except ImportError:
+            logger.warning("openai is not installed.")
+            self.client = None
 
-    return MockEmbeddingProvider()
+    def embed_text(self, text: str) -> List[float]:
+        if not self.client:
+            return [0.0] * self.dimension
+        response = self.client.embeddings.create(input=[text], model=self.model_name)
+        return response.data[0].embedding
+
+    def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        if not texts or not self.client:
+            return []
+        response = self.client.embeddings.create(input=texts, model=self.model_name)
+        return [data.embedding for data in response.data]
+
+
+def get_embedding_provider() -> EmbeddingProvider:
+    """
+    Factory to return the configured embedding provider using app settings.
+    """
+    from app.core.config import get_settings
+    settings = get_settings()
+    
+    provider_type = settings.embedding_provider.lower()
+
+    if provider_type == "openai":
+        key = settings.openai_api_key.get_secret_value() if settings.openai_api_key else ""
+        if key:
+            return OpenAIEmbeddingProvider(api_key=key, model_name=settings.embedding_model, dimension=settings.embedding_dimensions)
+            
+    elif provider_type == "gemini":
+        key = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else ""
+        if key:
+            return GeminiEmbeddingProvider(api_key=key, model_name=settings.embedding_model)
+
+    logger.warning("No valid embedding provider config found. Falling back to MockEmbeddingProvider.")
+    return MockEmbeddingProvider(dimension=settings.embedding_dimensions)
