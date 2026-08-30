@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from psycopg_pool import ConnectionPool
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.api.router import api_router
 from app.core.cache import build_cache_backend
@@ -14,10 +15,13 @@ from app.core.logging import configure_logging
 from app.core.middleware import (
     access_log_middleware,
     configure_rate_limiter,
+    global_exception_handler,
     rate_limit_middleware,
     request_size_middleware,
     security_headers_middleware,
 )
+from app.core.sentry import init_sentry
+from app.core.telemetry import setup_telemetry
 from app.core.token_blacklist import build_token_blacklist
 from app.db import (
     PostgresAnalyticsStore,
@@ -33,6 +37,7 @@ from app.db.session import init_db
 from app.services.ai import AIService
 from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService, AuthStoreProtocol
+from app.services.chat import ChatService
 from app.services.email import EmailService, build_email_backend
 from app.services.feedback import FeedbackService
 from app.services.lessons import LessonService
@@ -43,7 +48,7 @@ from app.services.recommendations import RecommendationService
 from app.services.storage import CloudflareStorageService
 
 configure_logging()
-startup_logger = logging.getLogger("sakhi.startup")
+startup_logger = logging.getLogger('sakhi.startup')
 
 
 def create_app(
@@ -52,24 +57,34 @@ def create_app(
 ) -> FastAPI:
     try:
         settings = settings or get_settings()
+        init_sentry(settings)
 
         @asynccontextmanager
         async def lifespan(app: FastAPI):
             yield
-            if hasattr(app.state, "db_pool"):
+            if hasattr(app.state, 'db_pool'):
                 app.state.db_pool.close()
+
+        openapi_tags = [
+            {"name": "Authentication", "description": "Operations with users and JWT authentication."},
+            {"name": "Chat", "description": "Endpoints for real-time multilingual AI chat."},
+            {"name": "Learning Modules", "description": "Endpoints to fetch educational content and track progress."},
+            {"name": "Admin", "description": "Administrative endpoints for metrics and content management."},
+            {"name": "Health", "description": "System health and readiness probes."},
+        ]
 
         app = FastAPI(
             title=settings.app_name,
             version=settings.app_version,
             debug=settings.debug,
             lifespan=lifespan,
+            openapi_tags=openapi_tags,
         )
 
         db_pool = ConnectionPool(
             settings.database_url,
-            kwargs={"connect_timeout": 10},
-            check=False,
+            kwargs={"connect_timeout": 10, "autocommit": True},
+            check=ConnectionPool.check_connection,
         )
         app.state.db_pool = db_pool
 
@@ -95,6 +110,7 @@ def create_app(
         app.state.auth_service = AuthService(settings, store=app.state.auth_store, blacklist=token_blacklist)
         app.state.ai_store = PostgresConversationStore(db_pool)
         app.state.ai_service = AIService(settings, store=app.state.ai_store)
+        app.state.chat_service = ChatService(settings, store=app.state.ai_store)
         app.state.lesson_store = PostgresLessonStore(db_pool)
         app.state.lesson_service = LessonService(settings, store=app.state.lesson_store, cache=cache_backend)
         app.state.feedback_store = PostgresFeedbackStore(db_pool)
@@ -151,30 +167,35 @@ def create_app(
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
+            expose_headers=["X-Conversation-Id", "X-Response-Time"],
         )
+        app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=["*"])
 
         app.middleware("http")(security_headers_middleware)
         app.middleware("http")(request_size_middleware)
         app.middleware("http")(rate_limit_middleware)
         app.middleware("http")(access_log_middleware)
+        app.middleware("http")(global_exception_handler)
 
         app.include_router(api_router)
 
-        @app.get("/api/health", include_in_schema=False)
+        @app.get('/api/health', include_in_schema=False)
         def lightweight_health_check() -> dict[str, str]:
-            return {"status": "ok"}
+            return {'status': 'ok'}
 
-        @app.get("/", include_in_schema=False)
+        @app.get('/', include_in_schema=False)
         def root() -> dict[str, str]:
             return {
-                "message": "Sakhi AI API is running",
-                "status": "ok",
+                'message': 'Sakhi AI API is running',
+                'status': 'ok',
             }
+
+        setup_telemetry(app)
 
         return app
     except Exception as exc:
-        startup_logger.exception("Failed to initialize Sakhi AI backend services.")
-        raise RuntimeError("Sakhi AI backend failed to start during initialization.") from exc
+        startup_logger.exception('Failed to initialize Sakhi AI backend services.')
+        raise RuntimeError('Sakhi AI backend failed to start during initialization.') from exc
 
 
 app = create_app()

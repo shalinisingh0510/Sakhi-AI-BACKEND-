@@ -27,7 +27,7 @@ class PersonalizationEngine:
         # 1. Symptom Analysis
         recent_symptoms = self.db.query(SymptomLog).filter(
             SymptomLog.health_profile_id == profile.id,
-            SymptomLog.log_date >= start_date
+            SymptomLog.start_date >= start_date
         ).all()
         
         severe_symptoms = [s for s in recent_symptoms if s.severity in ("severe", "worst")]

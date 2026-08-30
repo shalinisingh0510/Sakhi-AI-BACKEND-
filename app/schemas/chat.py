@@ -29,7 +29,6 @@ class ChatMessageRequest(BaseModel):
     mode: Literal["text", "voice"] = "text"
 
     model_config = ConfigDict(populate_by_name=True)
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     @model_validator(mode="before")
     @classmethod

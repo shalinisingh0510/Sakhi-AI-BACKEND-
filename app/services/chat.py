@@ -1,29 +1,21 @@
 from __future__ import annotations
 
 from app.core.config import Settings
+from app.schemas.ai import ConversationDetail
 from app.schemas.auth import SUPPORTED_LANGUAGES
-from app.schemas.chat import ChatMessageContent, ChatMessageData
-from app.services.ai import (
-    ConversationNotFoundError,
-    ConversationStoreProtocol,
-    StoredConversation,
-)
+from app.schemas.chat import ChatMessageContent, ChatMessageData, ChatMessageResponse
+from app.services.ai import ConversationNotFoundError, ConversationStoreProtocol, StoredConversation
 
 SUPPORTED_LANGUAGE_SET = {lang.lower() for lang in SUPPORTED_LANGUAGES}
 DEFAULT_LANGUAGE = "english"
 DEFAULT_TITLE = "Health guidance"
-
-from app.services.ai_context.context_builder import HealthContextBuilder, AIHealthContext
-from app.db.session import get_session_factory
-
+TEMPORARY_CHAT_REPLY = (
+    "Thanks, your message reached Sakhi Chat. "
+    "Sakhi Chat Service Response is a temporary backend response while the full assistant is being connected."
+)
 
 
 class ChatService:
-    """
-    Chat service orchestrating chat conversation lifecycle,
-    message validation, ownership verification, and response generation.
-    """
-
     def __init__(self, settings: Settings, store: ConversationStoreProtocol) -> None:
         self._settings = settings
         self._store = store
@@ -34,99 +26,101 @@ class ChatService:
         user_id: str,
         message: str,
         conversation_id: str | None = None,
+        preferred_language: str | None = None,
         language: str | None = None,
-    ) -> ChatMessageData:
-        target_language = self._normalize_language(language)
+        mode: str = "text",
+    ) -> ChatMessageResponse:
+        target_language = self._normalize_language(language or preferred_language)
+        detail = self.send_message(
+            user_id=user_id,
+            message=message,
+            conversation_id=conversation_id,
+            preferred_language=target_language,
+            mode=mode,
+        )
+        assistant_message = detail.messages[-1] if detail.messages else None
+        if assistant_message is None:
+            raise RuntimeError("Assistant message was not stored.")
 
-        # 1. Resolve or create conversation
-        if conversation_id:
-            conversation = self._get_owned_conversation(user_id=user_id, conversation_id=conversation_id)
-        else:
-            title = self._derive_title(message)
-            conversation = self._store.create_conversation(
-                user_id=user_id,
-                title=title,
-                preferred_language=target_language,
-            )
+        return ChatMessageResponse(
+            success=True,
+            data=ChatMessageData(
+                conversation_id=detail.conversation.id,
+                message=ChatMessageContent.model_validate(assistant_message),
+            ),
+            conversation=detail.conversation,
+            messages=detail.messages,
+        )
 
-        # 2. Persist the incoming user message
+    def send_message(
+        self,
+        *,
+        user_id: str,
+        message: str,
+        conversation_id: str | None = None,
+        preferred_language: str = "english",
+        mode: str = "text",
+    ) -> ConversationDetail:
+        conversation = self._resolve_conversation(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            initial_message=message,
+            preferred_language=self._normalize_language(preferred_language),
+        )
+
+        self._store.add_message(conversation_id=conversation.id, role="user", content=message)
         self._store.add_message(
             conversation_id=conversation.id,
-            role="user",
-            content=message,
-        )
-
-        # 3. Gather Context and RAG evidence
-        context = None
-        rag_evidence = []
-        try:
-            SessionLocal = get_session_factory()
-            with SessionLocal() as db:
-                builder = HealthContextBuilder(db, user_id)
-                context = builder.build_context(scopes=["LONGITUDINAL", "SYMPTOMS", "PROFILE"])
-                
-                from app.services.rag.retrieval import MedicalKnowledgeService
-                rag_service = MedicalKnowledgeService(db)
-                rag_evidence = rag_service.search(message, limit=3)
-        except Exception as e:
-            import logging
-            logging.error(f"Error fetching context/RAG: {e}")
-
-        # 4. Format Prompt and Generate Response
-        from app.services.ai_providers import get_provider
-        
-        system_prompt = "You are Sakhi, a compassionate women's health AI assistant. "
-        if context:
-            system_prompt += f"User context: {context.model_dump_json(exclude_none=True)}. "
-            
-        if rag_evidence:
-            system_prompt += "Here is some retrieved medical knowledge to use (cite it if relevant):\n"
-            for ev in rag_evidence:
-                system_prompt += f"- {ev.content} (Source: {ev.citation.source})\n"
-                
-        provider = get_provider()
-        reply_content = provider.generate_reply(
-            system_prompt=system_prompt,
-            conversation_history=[{"role": "user", "content": message}] # For a full implementation, we'd fetch actual history
-        )
-
-        # 4. Persist the assistant message
-        stored_assistant_msg = self._store.add_message(
-            conversation_id=conversation.id,
             role="assistant",
-            content=reply_content,
+            content=self._build_temporary_reply(mode=mode),
+        )
+        return self.get_conversation(user_id=user_id, conversation_id=conversation.id)
+
+    def get_conversation(self, *, user_id: str, conversation_id: str) -> ConversationDetail:
+        conversation = self._require_owned_conversation(user_id=user_id, conversation_id=conversation_id)
+        messages = [message.to_message() for message in self._store.get_messages(conversation_id)]
+        return ConversationDetail(conversation=conversation.to_summary(), messages=messages)
+
+    def _resolve_conversation(
+        self,
+        *,
+        user_id: str,
+        conversation_id: str | None,
+        initial_message: str,
+        preferred_language: str,
+    ) -> StoredConversation:
+        if conversation_id is not None:
+            return self._require_owned_conversation(user_id=user_id, conversation_id=conversation_id)
+
+        return self._store.create_conversation(
+            user_id=user_id,
+            title=self._build_conversation_title(initial_message),
+            preferred_language=preferred_language,
         )
 
-        # 5. Return structured response payload
-        return ChatMessageData(
-            conversation_id=conversation.id,
-            conversationId=conversation.id,
-            message=ChatMessageContent(
-                id=stored_assistant_msg.id,
-                role="assistant",
-                content=stored_assistant_msg.content,
-                created_at=stored_assistant_msg.created_at,
-            ),
-        )
-
-    def _get_owned_conversation(self, *, user_id: str, conversation_id: str) -> StoredConversation:
+    def _require_owned_conversation(self, *, user_id: str, conversation_id: str) -> StoredConversation:
         conversation = self._store.get_conversation(conversation_id)
         if conversation is None or conversation.user_id != user_id:
             raise ConversationNotFoundError("Conversation not found or access denied.")
         return conversation
 
-    def _derive_title(self, message: str) -> str:
-        cleaned = " ".join(message.strip().split())
-        if not cleaned:
+    def _build_conversation_title(self, message: str) -> str:
+        snippet = " ".join(message.strip().split())
+        if not snippet:
             return DEFAULT_TITLE
-        if len(cleaned) <= 50:
-            return cleaned
-        return f"{cleaned[:47].rstrip()}..."
+        if len(snippet) <= 60:
+            return snippet
+        return f"{snippet[:57].rstrip()}..."
 
     def _normalize_language(self, language: str | None) -> str:
         if not language:
             return DEFAULT_LANGUAGE
-        norm = language.strip().lower()
-        if norm in SUPPORTED_LANGUAGE_SET:
-            return norm
+        normalized = language.strip().lower()
+        if normalized in SUPPORTED_LANGUAGE_SET:
+            return normalized
         return DEFAULT_LANGUAGE
+
+    def _build_temporary_reply(self, *, mode: str) -> str:
+        if mode == "voice":
+            return TEMPORARY_CHAT_REPLY
+        return TEMPORARY_CHAT_REPLY
