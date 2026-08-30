@@ -22,8 +22,8 @@ REGISTER_ADMIN = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
@@ -59,8 +59,8 @@ def _setup(client: TestClient) -> tuple[str, str, str]:
 # Mark all as read
 # ---------------------------------------------------------------------------
 
-def test_mark_all_notifications_as_read(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "mark-all.sqlite3")
+def test_mark_all_notifications_as_read(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token, _, _ = _setup(client)
     headers = {"Authorization": f"Bearer {user_token}"}
 
@@ -78,8 +78,8 @@ def test_mark_all_notifications_as_read(tmp_path: Path) -> None:
     assert count_after == 0
 
 
-def test_mark_all_read_is_idempotent(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "mark-all-idempotent.sqlite3")
+def test_mark_all_read_is_idempotent(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token, _, _ = _setup(client)
     headers = {"Authorization": f"Bearer {user_token}"}
 
@@ -92,8 +92,8 @@ def test_mark_all_read_is_idempotent(tmp_path: Path) -> None:
     assert resp2.json()["updated_count"] == 0
 
 
-def test_mark_all_read_does_not_affect_other_users(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "mark-all-isolation.sqlite3")
+def test_mark_all_read_does_not_affect_other_users(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token, admin_token, user_id = _setup(client)
 
     # Create a notification for admin too
@@ -125,8 +125,8 @@ def test_mark_all_read_does_not_affect_other_users(tmp_path: Path) -> None:
     assert admin_count == 1
 
 
-def test_mark_all_read_requires_authentication(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "mark-all-unauth.sqlite3")
+def test_mark_all_read_requires_authentication(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     resp = client.post("/api/v1/notifications/read-all")
     assert resp.status_code == 401
 
@@ -135,8 +135,8 @@ def test_mark_all_read_requires_authentication(tmp_path: Path) -> None:
 # Delete notification
 # ---------------------------------------------------------------------------
 
-def test_user_can_delete_own_notification(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "delete-notif.sqlite3")
+def test_user_can_delete_own_notification(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token, _, _ = _setup(client)
     headers = {"Authorization": f"Bearer {user_token}"}
 
@@ -152,8 +152,8 @@ def test_user_can_delete_own_notification(tmp_path: Path) -> None:
     assert all(n["id"] != notif_id for n in after)
 
 
-def test_delete_nonexistent_notification_returns_404(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "delete-404.sqlite3")
+def test_delete_nonexistent_notification_returns_404(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token, _, _ = _setup(client)
     headers = {"Authorization": f"Bearer {user_token}"}
 
@@ -161,8 +161,8 @@ def test_delete_nonexistent_notification_returns_404(tmp_path: Path) -> None:
     assert resp.status_code == 404
 
 
-def test_user_cannot_delete_other_users_notification(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "delete-isolation.sqlite3")
+def test_user_cannot_delete_other_users_notification(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token, admin_token, user_id = _setup(client)
 
     # Get first notification ID belonging to the user
@@ -176,8 +176,8 @@ def test_user_cannot_delete_other_users_notification(tmp_path: Path) -> None:
     assert resp.status_code == 404  # Not found for admin — ownership enforced
 
 
-def test_deleted_notification_unread_count_decrements(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "delete-count.sqlite3")
+def test_deleted_notification_unread_count_decrements(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token, _, _ = _setup(client)
     headers = {"Authorization": f"Bearer {user_token}"}
 
@@ -193,14 +193,14 @@ def test_deleted_notification_unread_count_decrements(tmp_path: Path) -> None:
     assert client.get("/api/v1/notifications/unread-count", headers=headers).json()["unread_count"] == 2
 
 
-def test_delete_notification_requires_authentication(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "delete-unauth.sqlite3")
+def test_delete_notification_requires_authentication(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     resp = client.delete("/api/v1/notifications/some-id")
     assert resp.status_code == 401
 
 
-def test_create_notification_uses_realtime_push_path(tmp_path: Path, monkeypatch) -> None:
-    client = build_client(tmp_path / "realtime-push.sqlite3")
+def test_create_notification_uses_realtime_push_path(tmp_path: Path, monkeypatch, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token, admin_token, user_id = _setup(client)
 
     captured: dict[str, object] = {}

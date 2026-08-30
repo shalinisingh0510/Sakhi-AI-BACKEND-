@@ -112,12 +112,15 @@ class AIService:
         router = HealthSafetyRouter()
         
         # 1. Pre-generation validation
-        # We assume age 25 if not provided in health_context, ideally extracted from it.
+        # Extract age from health context safely.
         user_age = 25
-        if health_context and "age" in health_context:
+        if health_context:
             try:
-                user_age = int(health_context["age"])
-            except ValueError:
+                if "age" in health_context and health_context["age"] is not None:
+                    user_age = int(health_context["age"])
+                elif "profile" in health_context and health_context["profile"] and health_context["profile"].get("age") is not None:
+                    user_age = int(health_context["profile"]["age"])
+            except (ValueError, TypeError):
                 pass
 
         safety_result = router.validate_pre_generation(user_message, user_age)

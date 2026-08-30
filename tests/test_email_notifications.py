@@ -1,9 +1,9 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 
 from app.core.config import Settings
-from app.db import SQLiteAuthStore, SQLiteNotificationStore
+from app.db import PostgresAuthStore, PostgresNotificationStore
 from app.services.email import EmailService
 from app.services.notifications import NotificationService
 

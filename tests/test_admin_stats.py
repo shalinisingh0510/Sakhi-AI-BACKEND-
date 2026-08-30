@@ -22,8 +22,8 @@ REGISTER_USER = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
@@ -37,8 +37,8 @@ def _register_and_token(client: TestClient, user: dict) -> str:
 # Enhanced health check
 # ------------------------------------------------------------------
 
-def test_health_check_includes_database_status(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "health-db.sqlite3")
+def test_health_check_includes_database_status(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     resp = client.get("/api/v1/health")
     assert resp.status_code == 200
     payload = resp.json()
@@ -49,8 +49,8 @@ def test_health_check_includes_database_status(tmp_path: Path) -> None:
     assert "environment" in payload
 
 
-def test_health_check_returns_all_required_fields(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "health-fields.sqlite3")
+def test_health_check_returns_all_required_fields(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     resp = client.get("/api/v1/health")
     assert resp.status_code == 200
     payload = resp.json()
@@ -62,8 +62,8 @@ def test_health_check_returns_all_required_fields(tmp_path: Path) -> None:
 # Admin stats dashboard
 # ------------------------------------------------------------------
 
-def test_admin_stats_returns_correct_structure(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "admin-stats.sqlite3")
+def test_admin_stats_returns_correct_structure(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     admin_token = _register_and_token(client, REGISTER_ADMIN)
     headers = {"Authorization": f"Bearer {admin_token}"}
 
@@ -91,8 +91,8 @@ def test_admin_stats_returns_correct_structure(tmp_path: Path) -> None:
     assert "total_messages" in data["engagement"]
 
 
-def test_admin_stats_user_count_is_accurate(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "stats-users.sqlite3")
+def test_admin_stats_user_count_is_accurate(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     admin_token = _register_and_token(client, REGISTER_ADMIN)
     _register_and_token(client, REGISTER_USER)
     headers = {"Authorization": f"Bearer {admin_token}"}
@@ -102,8 +102,8 @@ def test_admin_stats_user_count_is_accurate(tmp_path: Path) -> None:
     assert resp.json()["users"]["total"] == 2
 
 
-def test_admin_stats_lesson_counts_reflect_seeded_content(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "stats-lessons.sqlite3")
+def test_admin_stats_lesson_counts_reflect_seeded_content(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     admin_token = _register_and_token(client, REGISTER_ADMIN)
     headers = {"Authorization": f"Bearer {admin_token}"}
 
@@ -116,8 +116,8 @@ def test_admin_stats_lesson_counts_reflect_seeded_content(tmp_path: Path) -> Non
     assert lessons["categories"] >= 3
 
 
-def test_admin_stats_engagement_increments_with_events(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "stats-events.sqlite3")
+def test_admin_stats_engagement_increments_with_events(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     admin_token = _register_and_token(client, REGISTER_ADMIN)
     user_token = _register_and_token(client, REGISTER_USER)
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
@@ -144,8 +144,8 @@ def test_admin_stats_engagement_increments_with_events(tmp_path: Path) -> None:
     assert engagement["total_lesson_completions"] == 1
 
 
-def test_admin_stats_requires_admin_role(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "stats-rbac.sqlite3")
+def test_admin_stats_requires_admin_role(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token = _register_and_token(client, REGISTER_USER)
     headers = {"Authorization": f"Bearer {user_token}"}
 
@@ -153,14 +153,14 @@ def test_admin_stats_requires_admin_role(tmp_path: Path) -> None:
     assert resp.status_code == 403
 
 
-def test_admin_stats_requires_authentication(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "stats-unauth.sqlite3")
+def test_admin_stats_requires_authentication(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     resp = client.get("/api/v1/admin/stats")
     assert resp.status_code == 401
 
 
-def test_admin_stats_excludes_soft_deleted_users(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "stats-soft-delete.sqlite3")
+def test_admin_stats_excludes_soft_deleted_users(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     admin_token = _register_and_token(client, REGISTER_ADMIN)
     user_token = _register_and_token(client, REGISTER_USER)
     user_headers = {"Authorization": f"Bearer {user_token}"}

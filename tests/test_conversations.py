@@ -15,13 +15,13 @@ REGISTER_USER = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
-def test_conversation_creation_message_and_persistence_flow(tmp_path: Path) -> None:
-    database_path = tmp_path / "conversations.sqlite3"
+def test_conversation_creation_message_and_persistence_flow(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
     client = build_client(database_path)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
@@ -78,8 +78,8 @@ def test_conversation_creation_message_and_persistence_flow(tmp_path: Path) -> N
     assert len(detail_response.json()["messages"]) == 4
 
 
-def test_conversation_is_private_to_owner(tmp_path: Path) -> None:
-    database_path = tmp_path / "conversations-private.sqlite3"
+def test_conversation_is_private_to_owner(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
     client = build_client(database_path)
 
     user_one = client.post("/api/v1/auth/register", json=REGISTER_USER)
@@ -108,8 +108,8 @@ def test_conversation_is_private_to_owner(tmp_path: Path) -> None:
     assert forbidden_response.status_code == 404
 
 
-def test_follow_up_message_uses_history_without_duplication(tmp_path: Path) -> None:
-    database_path = tmp_path / "conversations-history.sqlite3"
+def test_follow_up_message_uses_history_without_duplication(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
     client = build_client(database_path)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
