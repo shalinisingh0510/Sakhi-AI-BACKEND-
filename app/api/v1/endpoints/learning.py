@@ -1,11 +1,18 @@
-"""Learning Content API endpoints for Sakhi AI.
+"""Learning Content API endpoints for Sakhi AI — Phase 1+2.
 
 Public routes (authenticated users):
-  GET  /api/v1/learning                      — paginated feed of PUBLISHED content
-  GET  /api/v1/learning/progress/summary     — user's learning stats
-  GET  /api/v1/learning/{id}                 — single PUBLISHED content item
-  GET  /api/v1/learning/{id}/progress        — user's progress on an item
-  POST /api/v1/learning/{id}/progress        — update progress
+  GET  /api/v1/learning                          — paginated feed (with topic/subtopic/audience filters)
+  GET  /api/v1/learning/topics                   — list all active topics with subtopics
+  GET  /api/v1/learning/topics/{slug}            — single topic + subtopics
+  GET  /api/v1/learning/topics/{slug}/content    — paginated content for a topic
+  GET  /api/v1/learning/progress/summary         — user's learning stats
+  GET  /api/v1/learning/history                  — user's learning history
+  GET  /api/v1/learning/bookmarks                — user's saved learning
+  POST /api/v1/learning/{id}/bookmark            — toggle bookmark
+  GET  /api/v1/learning/{id}                     — single PUBLISHED content item
+  GET  /api/v1/learning/{id}/related             — related content
+  GET  /api/v1/learning/{id}/progress            — user's progress on an item
+  POST /api/v1/learning/{id}/progress            — update progress
 
 Admin routes (role=admin required):
   GET    /api/v1/admin/learning              — all content (any status)
@@ -20,7 +27,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, pagination_params, require_roles
@@ -34,17 +41,123 @@ from app.schemas.learning import (
     LearningProgressUpdate,
     LearningSummaryResponse,
     LearningHistoryResponse,
+    TopicResponse,
+    TopicsListResponse,
+    LearningPathListResponse,
+    LearningPathResponse,
+    LearningPathProgressResponse,
 )
 from app.services.auth import StoredUser
-from app.services.learning_service import LearningContentNotFoundError, LearningService
+from app.services.learning_service import LearningContentNotFoundError, TopicNotFoundError, LearningService
+from app.models.health_profile import HealthProfile
+from datetime import date
+from sqlalchemy import select
 
 router = APIRouter(tags=["learning"])
 
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
-
 def get_learning_service(request: Request, db: Session = Depends(get_db)) -> LearningService:
     return LearningService(db, storage_service=request.app.state.storage_service)
+
+def get_learning_context(
+    current_user: StoredUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> dict:
+    lang_map = {"english": "en", "hindi": "hi", "marathi": "mr"}
+    user_lang = lang_map.get((current_user.preferred_language or "").lower(), "en")
+
+    user_audience = "ADULT"
+    profile = db.scalar(select(HealthProfile).where(HealthProfile.user_id == current_user.id))
+    if profile and profile.date_of_birth:
+        today = date.today()
+        dob = profile.date_of_birth
+        age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+        if age < 18:
+            user_audience = "TEEN"
+        
+    return {"language": user_lang, "audience": user_audience}
+
+
+# ---------------------------------------------------------------------------
+# Topic Endpoints (Phase 1)
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/learning/topics",
+    response_model=TopicsListResponse,
+    summary="List all active topics with subtopics",
+)
+def get_topics(
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningService = Depends(get_learning_service),
+) -> Any:
+    topics = service.get_topics(active_only=True)
+    return {"items": topics, "total": len(topics)}
+
+
+@router.get(
+    "/learning/topics/{slug}",
+    response_model=TopicResponse,
+    summary="Get a single topic by slug (with subtopics)",
+)
+def get_topic(
+    slug: str,
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningService = Depends(get_learning_service),
+) -> Any:
+    try:
+        return service.get_topic_by_slug(slug)
+    except TopicNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get(
+    "/learning/topics/{slug}/content",
+    response_model=LearningContentListResponse,
+    summary="Get paginated content for a topic",
+)
+def get_topic_content(
+    slug: str,
+    subtopic: Optional[str] = Query(None, description="Subtopic slug filter"),
+    content_type: Optional[str] = Query(None),
+    language: Optional[str] = Query(None),
+    audience: Optional[str] = Query(None),
+    pagination: tuple[int, int] = Depends(pagination_params),
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningService = Depends(get_learning_service),
+    ctx: dict = Depends(get_learning_context),
+) -> Any:
+    offset, limit = pagination
+    try:
+        # Enforce language fallback if not explicitly provided
+        applied_language = language or ctx["language"]
+        
+        # Enforce audience: if user is TEEN, they cannot query ADULT
+        applied_audience = audience
+        if ctx["audience"] == "TEEN":
+            applied_audience = "TEEN"  # Force teen (which includes ALL)
+        elif not applied_audience:
+            applied_audience = "ADULT" # Default to ADULT (which includes ALL)
+
+        items, total = service.get_topic_content(
+            topic_slug=slug,
+            subtopic_slug=subtopic,
+            content_type=content_type,
+            language=applied_language,
+            audience=applied_audience,
+            limit=limit,
+            offset=offset,
+        )
+    except TopicNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+    return {
+        "items": items,
+        "total": total,
+        "page": (offset // limit) + 1,
+        "page_size": limit,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -63,17 +176,38 @@ def get_learning_feed(
     language: Optional[str] = Query(None),
     is_featured: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
+    # Phase 1 filters
+    topic_id: Optional[str] = Query(None),
+    subtopic_id: Optional[str] = Query(None),
+    audience: Optional[str] = Query(None),
+    is_short_form: Optional[bool] = Query(None),
     pagination: tuple[int, int] = Depends(pagination_params),
     current_user: StoredUser = Depends(get_current_user),
     service: LearningService = Depends(get_learning_service),
+    ctx: dict = Depends(get_learning_context),
 ) -> Any:
     offset, limit = pagination
+    
+    # Language filtering
+    applied_language = language or ctx["language"]
+
+    # Audience filtering
+    applied_audience = audience
+    if ctx["audience"] == "TEEN":
+        applied_audience = "TEEN"
+    elif not applied_audience:
+        applied_audience = "ADULT"
+
     items, total = service.get_feed(
         category=category,
         content_type=content_type,
-        language=language,
+        language=applied_language,
         is_featured=is_featured,
         search=search,
+        topic_id=topic_id,
+        subtopic_id=subtopic_id,
+        audience=applied_audience,
+        is_short_form=is_short_form,
         limit=limit,
         offset=offset,
     )
@@ -96,6 +230,79 @@ def get_progress_summary(
 ) -> Any:
     return service.get_user_progress_summary(current_user.id)
 
+# ---------------------------------------------------------------------------
+# Learning Paths Endpoints (Phase 5)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/learning/paths",
+    response_model=LearningPathListResponse,
+    summary="Get paginated list of learning paths",
+)
+def get_learning_paths(
+    topic_slug: Optional[str] = Query(None),
+    language: Optional[str] = Query(None),
+    audience: Optional[str] = Query(None),
+    pagination: tuple[int, int] = Depends(pagination_params),
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningService = Depends(get_learning_service),
+    ctx: dict = Depends(get_learning_context),
+) -> Any:
+    offset, limit = pagination
+    
+    applied_language = language or ctx["language"]
+    applied_audience = audience
+    if ctx["audience"] == "TEEN":
+        applied_audience = "TEEN"
+    elif not applied_audience:
+        applied_audience = "ADULT"
+
+    items, total = service.get_paths(
+        topic_slug=topic_slug,
+        language=applied_language,
+        audience=applied_audience,
+        limit=limit,
+        offset=offset,
+    )
+    
+    return {
+        "items": items,
+        "total": total,
+        "page": (offset // limit) + 1,
+        "page_size": limit,
+    }
+
+@router.get(
+    "/learning/paths/{slug}",
+    response_model=LearningPathResponse,
+    summary="Get a single learning path by slug",
+)
+def get_learning_path(
+    slug: str,
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningService = Depends(get_learning_service),
+) -> Any:
+    try:
+        return service.get_path_by_slug(slug)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+@router.get(
+    "/learning/paths/{id}/progress",
+    response_model=LearningPathProgressResponse,
+    summary="Get user progress for a learning path",
+)
+def get_learning_path_progress(
+    id: str,
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningService = Depends(get_learning_service),
+) -> Any:
+    try:
+        return service.get_path_progress(current_user.id, id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
 
 @router.get(
     "/learning/history",
@@ -111,7 +318,7 @@ def get_learning_history(
     history = service.get_learning_history(current_user.id, limit=limit, offset=offset)
     return {
         "items": history,
-        "total": len(history), # Simplification, ideal is total count query
+        "total": len(history),
         "page": (offset // limit) + 1,
         "page_size": limit,
     }
@@ -131,7 +338,7 @@ def get_learning_bookmarks(
     items = service.get_bookmarks(current_user.id, limit=limit, offset=offset)
     return {
         "items": items,
-        "total": len(items), # Simplification
+        "total": len(items),
         "page": (offset // limit) + 1,
         "page_size": limit,
     }
@@ -147,7 +354,6 @@ def toggle_bookmark(
     service: LearningService = Depends(get_learning_service),
 ) -> Any:
     try:
-        # Verify content exists
         service.get_content(content_id)
         saved = service.toggle_bookmark(current_user.id, content_id)
         return {"saved": saved}
@@ -156,17 +362,27 @@ def toggle_bookmark(
 
 
 @router.get(
-    "/learning/{content_id}",
+    "/learning/{id}",
     response_model=LearningContentResponse,
-    summary="Get a single published learning content item",
+    summary="Get a single PUBLISHED learning content item",
 )
-def get_learning_content(
-    content_id: str,
+def get_learning_item(
+    id: str,
     current_user: StoredUser = Depends(get_current_user),
     service: LearningService = Depends(get_learning_service),
+    ctx: dict = Depends(get_learning_context),
 ) -> Any:
     try:
-        return service.get_content(content_id, admin=False)
+        content = service.get_content(id)
+        
+        # Enforce audience access control
+        if ctx["audience"] == "TEEN" and content.audience == "ADULT":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Not eligible to view this content."
+            )
+            
+        return content
     except LearningContentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
@@ -251,6 +467,7 @@ def admin_list_content(
     status_filter: Optional[str] = Query(None, alias="status"),
     content_type: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
+    topic_id: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     pagination: tuple[int, int] = Depends(pagination_params),
     current_user: StoredUser = Depends(require_roles("admin")),
@@ -261,6 +478,7 @@ def admin_list_content(
         status=status_filter,
         content_type=content_type,
         category=category,
+        topic_id=topic_id,
         search=search,
         limit=limit,
         offset=offset,

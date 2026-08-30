@@ -1,18 +1,29 @@
-"""Learning Content Service — business logic layer for Sakhi AI Learning System."""
+"""Learning Content Service — business logic layer for Sakhi AI Learning System.
+
+Phase 1 additions:
+  - Topic / Subtopic taxonomy methods
+  - topic_id / subtopic_id / audience filtering in get_feed
+  - Translation group support (architecture)
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
 from typing import List, Optional, Tuple
 
-from sqlalchemy import and_, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, func, select, String
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.learning import (
     VALID_COMBINATIONS,
     LearningContent,
     LearningProgress,
     LearningBookmark,
+    LearningPath,
+    LearningModule,
+    LearningModuleItem,
+    Topic,
+    Subtopic,
     extract_youtube_id,
     validate_content_combination,
 )
@@ -23,6 +34,10 @@ class LearningContentNotFoundError(ValueError):
 
 
 class InvalidContentError(ValueError):
+    pass
+
+
+class TopicNotFoundError(ValueError):
     pass
 
 
@@ -67,6 +82,83 @@ class LearningService:
         return content
 
     # ------------------------------------------------------------------
+    # Topic / Subtopic methods (Phase 1)
+    # ------------------------------------------------------------------
+
+    def get_topics(self, active_only: bool = True) -> List[Topic]:
+        """Return all topics with their subtopics eagerly loaded."""
+        query = select(Topic).options(selectinload(Topic.subtopics))
+        if active_only:
+            query = query.where(Topic.is_active.is_(True))
+        query = query.order_by(Topic.display_order)
+        return list(self._db.scalars(query).all())
+
+    def get_topic_by_slug(self, slug: str) -> Topic:
+        """Return a single topic by slug (with subtopics)."""
+        topic = self._db.scalar(
+            select(Topic)
+            .options(selectinload(Topic.subtopics))
+            .where(Topic.slug == slug)
+        )
+        if not topic:
+            raise TopicNotFoundError(f"Topic '{slug}' not found.")
+        return topic
+
+    def get_topic_content(
+        self,
+        topic_slug: str,
+        subtopic_slug: Optional[str] = None,
+        content_type: Optional[str] = None,
+        language: Optional[str] = None,
+        audience: Optional[str] = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Tuple[List[LearningContent], int]:
+        """Return published content filtered by topic (and optionally subtopic)."""
+        topic = self.get_topic_by_slug(topic_slug)
+
+        query = select(LearningContent).where(
+            and_(
+                LearningContent.status == "PUBLISHED",
+                LearningContent.topic_id == topic.id,
+            )
+        )
+
+        if subtopic_slug:
+            subtopic = self._db.scalar(
+                select(Subtopic).where(
+                    and_(Subtopic.topic_id == topic.id, Subtopic.slug == subtopic_slug)
+                )
+            )
+            if subtopic:
+                query = query.where(LearningContent.subtopic_id == subtopic.id)
+
+        if content_type:
+            query = query.where(LearningContent.content_type == content_type)
+        if language:
+            query = query.where(LearningContent.language == language)
+        if audience:
+            if audience == "TEEN":
+                query = query.where(LearningContent.audience.in_(["TEEN", "ALL"]))
+            elif audience == "ADULT":
+                query = query.where(LearningContent.audience.in_(["ADULT", "ALL"]))
+            else:
+                query = query.where(LearningContent.audience == audience)
+
+        total_count = self._db.scalar(
+            select(func.count()).select_from(query.subquery())
+        ) or 0
+
+        query = query.order_by(
+            LearningContent.featured_rank.asc().nulls_last(),
+            LearningContent.published_at.desc().nulls_last(),
+            LearningContent.created_at.desc(),
+        ).offset(offset).limit(limit)
+
+        results = self._db.scalars(query).all()
+        return [self._resolve_urls(c) for c in results], total_count
+
+    # ------------------------------------------------------------------
     # Public (user-facing) methods
     # ------------------------------------------------------------------
 
@@ -77,6 +169,10 @@ class LearningService:
         language: Optional[str] = None,
         is_featured: Optional[bool] = None,
         search: Optional[str] = None,
+        topic_id: Optional[str] = None,
+        subtopic_id: Optional[str] = None,
+        audience: Optional[str] = None,
+        is_short_form: Optional[bool] = None,
         limit: int = 20,
         offset: int = 0,
     ) -> Tuple[List[LearningContent], int]:
@@ -90,15 +186,35 @@ class LearningService:
             query = query.where(LearningContent.language == language)
         if is_featured is not None:
             query = query.where(LearningContent.is_featured == is_featured)
+        if is_short_form is not None:
+            query = query.where(LearningContent.is_short_form == is_short_form)
         if search:
             like_term = f"%{search}%"
-            query = query.where(LearningContent.title.ilike(like_term))
+            query = query.where(
+                LearningContent.title.ilike(like_term)
+                | LearningContent.description.ilike(like_term)
+                | func.cast(LearningContent.tags, String).ilike(like_term)
+            )
+        if topic_id:
+            query = query.where(LearningContent.topic_id == topic_id)
+        if subtopic_id:
+            query = query.where(LearningContent.subtopic_id == subtopic_id)
+        if audience:
+            if audience == "TEEN":
+                query = query.where(LearningContent.audience.in_(["TEEN", "ALL"]))
+            elif audience == "ADULT":
+                query = query.where(LearningContent.audience.in_(["ADULT", "ALL"]))
+            else:
+                query = query.where(LearningContent.audience == audience)
 
         total_count = self._db.scalar(
             select(func.count()).select_from(query.subquery())
         ) or 0
 
-        query = query.order_by(LearningContent.created_at.desc()).offset(offset).limit(limit)
+        query = query.order_by(
+            LearningContent.featured_rank.asc().nulls_last(),
+            LearningContent.created_at.desc(),
+        ).offset(offset).limit(limit)
         results = self._db.scalars(query).all()
         return [self._resolve_urls(c) for c in results], total_count
 
@@ -314,20 +430,142 @@ class LearningService:
         return progress
 
     # ------------------------------------------------------------------
-    # Public (user-facing) methods
+    # Phase 5: Learning Paths Methods
     # ------------------------------------------------------------------
+
+    def get_paths(
+        self,
+        topic_slug: Optional[str] = None,
+        language: Optional[str] = None,
+        audience: Optional[str] = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> Tuple[List[LearningPath], int]:
+        query = select(LearningPath).where(LearningPath.status == "PUBLISHED")
+
+        if topic_slug:
+            topic = self.get_topic_by_slug(topic_slug)
+            query = query.where(LearningPath.topic_id == topic.id)
+            
+        if language:
+            query = query.where(LearningPath.language == language)
+            
+        if audience:
+            if audience == "TEEN":
+                query = query.where(LearningPath.audience.in_(["TEEN", "ALL"]))
+            elif audience == "ADULT":
+                query = query.where(LearningPath.audience.in_(["ADULT", "ALL"]))
+            else:
+                query = query.where(LearningPath.audience == audience)
+
+        total_count = self._db.scalar(select(func.count()).select_from(query.subquery())) or 0
+        
+        query = query.order_by(
+            LearningPath.display_order.asc(),
+            LearningPath.published_at.desc().nulls_last()
+        ).offset(offset).limit(limit)
+        
+        return list(self._db.scalars(query).all()), total_count
+
+    def get_path_by_slug(self, slug: str) -> LearningPath:
+        path = self._db.scalar(
+            select(LearningPath)
+            .options(
+                selectinload(LearningPath.modules).selectinload(LearningModule.items).selectinload(LearningModuleItem.content)
+            )
+            .where(LearningPath.slug == slug)
+        )
+        if not path:
+            raise ValueError(f"Learning Path '{slug}' not found.")
+            
+        # Resolve URLs for all content in the path
+        for module in path.modules:
+            for item in module.items:
+                item.content = self._resolve_urls(item.content)
+                
+        return path
+
+    def get_path_progress(self, user_id: str, path_id: str) -> dict:
+        """Calculate progress for a learning path for a given user."""
+        path = self._db.scalar(
+            select(LearningPath)
+            .options(selectinload(LearningPath.modules).selectinload(LearningModule.items))
+            .where(LearningPath.id == path_id)
+        )
+        
+        if not path:
+            raise ValueError(f"Learning Path '{path_id}' not found.")
+
+        # Extract all content IDs in this path
+        module_contents = {}
+        all_content_ids = []
+        
+        for module in path.modules:
+            c_ids = [item.content_id for item in module.items]
+            module_contents[module.id] = c_ids
+            all_content_ids.extend(c_ids)
+            
+        if not all_content_ids:
+            return {
+                "path_id": path_id,
+                "completed_content": 0,
+                "total_content": 0,
+                "progress_percent": 0,
+                "module_progress": {}
+            }
+
+        # Fetch progress for these content IDs
+        progress_records = self._db.scalars(
+            select(LearningProgress).where(
+                and_(
+                    LearningProgress.user_id == user_id,
+                    LearningProgress.content_id.in_(all_content_ids),
+                    LearningProgress.completed.is_(True)
+                )
+            )
+        ).all()
+        
+        completed_set = {p.content_id for p in progress_records}
+        
+        # Calculate per-module progress
+        module_progress = {}
+        for mod_id, c_ids in module_contents.items():
+            completed_in_mod = sum(1 for cid in c_ids if cid in completed_set)
+            module_progress[mod_id] = {
+                "completed": completed_in_mod,
+                "total": len(c_ids)
+            }
+            
+        total_completed = len(completed_set)
+        total_content = len(all_content_ids)
+        progress_percent = int((total_completed / total_content) * 100) if total_content > 0 else 0
+        
+        return {
+            "path_id": path_id,
+            "completed_content": total_completed,
+            "total_content": total_content,
+            "progress_percent": progress_percent,
+            "module_progress": module_progress
+        }
+
     def get_related_content(self, content_id: str, limit: int = 4) -> List[LearningContent]:
         content = self.get_content(content_id)
         if not content:
             return []
 
-        query = select(LearningContent).where(
-            and_(
-                LearningContent.status == "PUBLISHED",
-                LearningContent.id != content_id,
-                LearningContent.category == content.category
-            )
-        ).order_by(LearningContent.created_at.desc()).limit(limit)
+        # If content has a topic, prefer topic-based related content
+        filters = [
+            LearningContent.status == "PUBLISHED",
+            LearningContent.id != content_id,
+        ]
+        if content.topic_id:
+            filters.append(LearningContent.topic_id == content.topic_id)
+        else:
+            filters.append(LearningContent.category == content.category)
+
+        query = select(LearningContent).where(and_(*filters)).order_by(
+            LearningContent.created_at.desc()
+        ).limit(limit)
 
         results = self._db.scalars(query).all()
         return [self._resolve_urls(c) for c in results]
@@ -341,6 +579,7 @@ class LearningService:
         status: Optional[str] = None,
         content_type: Optional[str] = None,
         category: Optional[str] = None,
+        topic_id: Optional[str] = None,
         search: Optional[str] = None,
         limit: int = 20,
         offset: int = 0,
@@ -352,6 +591,8 @@ class LearningService:
             query = query.where(LearningContent.content_type == content_type)
         if category:
             query = query.where(LearningContent.category == category)
+        if topic_id:
+            query = query.where(LearningContent.topic_id == topic_id)
         if search:
             query = query.where(LearningContent.title.ilike(f"%{search}%"))
 
