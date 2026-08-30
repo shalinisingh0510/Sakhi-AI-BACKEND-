@@ -13,10 +13,10 @@ def health_check(request: Request) -> dict:
     db_status = "ok"
     db_error: str | None = None
     try:
-        # Every store shares the same SQLite file; use auth store as the probe
         store = getattr(request.app.state, "auth_store", None)
-        if store is not None and hasattr(store, "_connection"):
-            store._connection.execute("SELECT 1").fetchone()
+        if store is not None and hasattr(store, "_pool"):
+            with store._pool.connection() as conn:
+                conn.execute("SELECT 1").fetchone()
         else:
             db_status = "unknown"
     except Exception as exc:

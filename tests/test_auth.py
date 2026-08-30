@@ -22,13 +22,13 @@ REGISTER_ADMIN = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
-def test_auth_registration_login_profile_and_preference_update_flow(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "auth.sqlite3")
+def test_auth_registration_login_profile_and_preference_update_flow(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert register_response.status_code == 201
@@ -83,8 +83,8 @@ def test_auth_registration_login_profile_and_preference_update_flow(tmp_path: Pa
     assert second_refresh_response.status_code == 200
 
 
-def test_registered_user_persists_across_app_instances(tmp_path: Path) -> None:
-    database_path = tmp_path / "persistent-auth.sqlite3"
+def test_registered_user_persists_across_app_instances(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
 
     first_client = build_client(database_path)
     register_response = first_client.post("/api/v1/auth/register", json=REGISTER_USER)
@@ -97,8 +97,8 @@ def test_registered_user_persists_across_app_instances(tmp_path: Path) -> None:
     assert login_response.json()["user"]["email"] == REGISTER_USER["email"]
 
 
-def test_admin_route_requires_admin_role(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "admin-role.sqlite3")
+def test_admin_route_requires_admin_role(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert register_response.status_code == 201
@@ -111,8 +111,8 @@ def test_admin_route_requires_admin_role(tmp_path: Path) -> None:
     assert admin_response.status_code == 403
 
 
-def test_admin_route_allows_admin_role(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "admin-success.sqlite3")
+def test_admin_route_allows_admin_role(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_ADMIN)
     assert register_response.status_code == 201
@@ -126,8 +126,8 @@ def test_admin_route_allows_admin_role(tmp_path: Path) -> None:
     assert admin_response.json()["message"] == "Admin access granted"
 
 
-def test_admin_can_list_users_and_change_role(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "role-management.sqlite3")
+def test_admin_can_list_users_and_change_role(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201

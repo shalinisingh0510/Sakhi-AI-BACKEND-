@@ -1,7 +1,8 @@
 import os
 from typing import Protocol, List
 from pydantic import BaseModel
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from PIL import Image
 import io
 
@@ -26,9 +27,8 @@ class GeminiVisionProvider:
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not set.")
             
-        genai.configure(api_key=self.api_key)
-        # 1.5 flash handles multimodality natively
-        self.model = genai.GenerativeModel(model_name)
+        self.client = genai.Client(api_key=self.api_key)
+        self.model_name = model_name
 
     def identify_food(self, image_bytes: bytes) -> List[FoodCandidate]:
         image = Image.open(io.BytesIO(image_bytes))
@@ -48,9 +48,10 @@ class GeminiVisionProvider:
         """
         
         try:
-            response = self.model.generate_content(
-                [prompt, image],
-                generation_config={"response_mime_type": "application/json"}
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[prompt, image],
+                config=types.GenerateContentConfig(response_mime_type="application/json")
             )
             import json
             data = json.loads(response.text)

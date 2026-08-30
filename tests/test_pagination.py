@@ -22,8 +22,8 @@ REGISTER_ADMIN = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
@@ -37,8 +37,8 @@ def _register_and_token(client: TestClient, user: dict) -> str:
 # Conversation pagination
 # ------------------------------------------------------------------
 
-def test_conversations_default_pagination(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "conv-page.sqlite3")
+def test_conversations_default_pagination(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _register_and_token(client, REGISTER_USER)
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -56,8 +56,8 @@ def test_conversations_default_pagination(tmp_path: Path) -> None:
     assert len(resp.json()) == 5
 
 
-def test_conversations_page_size_limits(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "conv-page2.sqlite3")
+def test_conversations_page_size_limits(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _register_and_token(client, REGISTER_USER)
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -89,8 +89,8 @@ def test_conversations_page_size_limits(tmp_path: Path) -> None:
     assert len(resp4.json()) == 0
 
 
-def test_conversations_pagination_pages_are_non_overlapping(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "conv-nooverlap.sqlite3")
+def test_conversations_pagination_pages_are_non_overlapping(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _register_and_token(client, REGISTER_USER)
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -112,8 +112,8 @@ def test_conversations_pagination_pages_are_non_overlapping(tmp_path: Path) -> N
 # Notification pagination
 # ------------------------------------------------------------------
 
-def test_notifications_pagination(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "notif-page.sqlite3")
+def test_notifications_pagination(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _register_and_token(client, REGISTER_USER)
     user_id = client.get(
         "/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}
@@ -152,8 +152,8 @@ def test_notifications_pagination(tmp_path: Path) -> None:
     assert len(resp3.json()) == 1
 
 
-def test_pagination_invalid_params_rejected(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "page-invalid.sqlite3")
+def test_pagination_invalid_params_rejected(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _register_and_token(client, REGISTER_USER)
     headers = {"Authorization": f"Bearer {token}"}
 
