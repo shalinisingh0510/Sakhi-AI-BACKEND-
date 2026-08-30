@@ -115,7 +115,7 @@ class AIService:
         
         # 1. Pre-generation validation
         # Extract age from health context safely.
-        user_age = 25
+        user_age = None
         if health_context:
             try:
                 if "age" in health_context and health_context["age"] is not None:
@@ -131,6 +131,8 @@ class AIService:
 
         # 2. RAG Retrieval
         retrieved_context = None
+        start_time = __import__("time").time()
+        retrieval_result = None
         try:
             db = SessionLocal()
             try:
@@ -147,6 +149,24 @@ class AIService:
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"RAG search failed: {e}")
+        finally:
+            # Track analytics (hardcoded event logging for now without heavy refactor)
+            try:
+                latency = __import__("time").time() - start_time
+                chunks_returned = len(retrieval_result.matched_chunks) if retrieval_result and retrieval_result.matched_chunks else 0
+                import psycopg
+                from app.core.config import get_settings
+                with psycopg.connect(get_settings().database_url) as conn:
+                    with conn.cursor() as cur:
+                        import uuid, json, datetime
+                        cur.execute(
+                            "INSERT INTO analytics_events (id, user_id, event_type, metadata_json, created_at) VALUES (%s, %s, %s, %s, %s)",
+                            (uuid.uuid4().hex, "system", "rag_query", json.dumps({"latency": latency, "chunks_returned": chunks_returned}), datetime.datetime.now(datetime.timezone.utc).isoformat())
+                        )
+                    conn.commit()
+            except Exception as ex:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to track RAG analytics: {ex}")
 
         # 3. LLM Generation
         reply_response = self._provider.generate_reply(

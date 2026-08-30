@@ -48,7 +48,7 @@ def test_1_valid_message_creates_conversation_and_returns_assistant_reply(tmp_pa
     assert conv_id is not None
     assert data["message"]["role"] == "assistant"
     assert len(data["message"]["content"]) > 0
-    assert "Sakhi Chat Service Response" in data["message"]["content"]
+    assert "not a diagnosis" in data["message"]["content"]
 
 
 def test_2_empty_message_validation_error(tmp_path: Path, test_db_url: str) -> None:

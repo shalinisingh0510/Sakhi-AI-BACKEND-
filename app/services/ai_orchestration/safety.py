@@ -15,13 +15,14 @@ class SafetyValidationResult(BaseModel):
     risk_level: SafetyRiskLevel
     reason: str = ""
     override_message: str = ""
+    fallback_message: str = ""
 
 class HealthSafetyRouter:
     """
     Evaluates queries and responses to enforce medical boundaries.
     """
     
-    def validate_pre_generation(self, query: str, user_age: int = 25) -> SafetyValidationResult:
+    def validate_pre_generation(self, query: str, user_age: int | None = None) -> SafetyValidationResult:
         query_lower = query.lower()
         
         # 0. Out of Scope Detection
@@ -32,31 +33,31 @@ class HealthSafetyRouter:
                 is_safe=False,
                 risk_level=SafetyRiskLevel.OUT_OF_SCOPE,
                 reason="Query appears to be out of the women's health scope.",
-                override_message="I'm Sakhi, a women's health assistant. I can't answer general or unrelated questions like that, but I'm here if you want to talk about health, wellness, or your body."
-            )
-
-        # 1. Emergency Detection
-        emergency_keywords = ["suicide", "kill myself", "heart attack", "stroke", "bleeding out", "can't breathe"]
-        if any(w in query_lower for w in emergency_keywords):
-            return SafetyValidationResult(
-                is_safe=False,
-                risk_level=SafetyRiskLevel.URGENT_EMERGENCY,
-                reason="Potential medical emergency detected.",
-                override_message="It sounds like you might be experiencing a medical emergency. Please contact emergency services or go to the nearest hospital immediately."
+                fallback_message="I specialize in women's health and wellness. How can I help you with that today?"
             )
             
-        # 2. High-Risk Medical Advice
-        high_risk_keywords = ["cancer", "tumor", "dose", "prescription", "should i stop taking", "diagnose me"]
-        if any(w in query_lower for w in high_risk_keywords):
+        # 1. Emergency Detection
+        emergency_keywords = ["suicide", "kill myself", "die", "heart attack", "stroke", "severe pain", "bleeding heavily", "can't breathe"]
+        if any(kw in query_lower for kw in emergency_keywords):
             return SafetyValidationResult(
                 is_safe=False,
-                risk_level=SafetyRiskLevel.HIGH_RISK_MEDICAL,
-                reason="Requesting specific medical diagnosis or prescription advice.",
-                override_message="I cannot provide medical diagnoses or advice about prescriptions. Please consult a healthcare professional for these concerns."
+                risk_level=SafetyRiskLevel.EMERGENCY,
+                reason="Potential medical emergency detected.",
+                fallback_message="This sounds like a medical emergency. Please contact your local emergency services or visit the nearest hospital immediately."
+            )
+            
+        # 2. Diagnosis Prevention (heuristics)
+        diagnosis_keywords = ["do i have", "is this cancer", "diagnose me", "what disease"]
+        if any(kw in query_lower for kw in diagnosis_keywords):
+            return SafetyValidationResult(
+                is_safe=False,
+                risk_level=SafetyRiskLevel.HIGH,
+                reason="User is seeking a medical diagnosis.",
+                fallback_message="I cannot diagnose medical conditions. Please consult a healthcare professional."
             )
             
         # 3. Teen Safety Guardrails
-        if 13 <= user_age < 18:
+        if user_age is not None and 13 <= user_age < 18:
             teen_restricted = ["lose weight fast", "calorie deficit", "diet pills", "fasting"]
             if any(w in query_lower for w in teen_restricted):
                 return SafetyValidationResult(

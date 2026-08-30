@@ -216,14 +216,14 @@ class TestAgePolicy:
     def test_age_group_string(self) -> None:
         from app.domain.health.age_policy import AgePolicy
 
-        policy = AgePolicy(age_group="14-18")
+        policy = AgePolicy(age=15)
         assert policy.is_teen is True
         assert policy.can_use_cycle_tracking() is True
 
     def test_adult_age_group_string(self) -> None:
         from app.domain.health.age_policy import AgePolicy
 
-        policy = AgePolicy(age_group="18+")
+        policy = AgePolicy(age=25)
         assert policy.is_adult is True
         assert policy.can_use_weight_features() is True
 
