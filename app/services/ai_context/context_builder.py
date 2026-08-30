@@ -52,12 +52,16 @@ class HealthContextBuilder:
         )
         
         if "PROFILE" in scopes:
+            age = None
+            if profile.date_of_birth:
+                age = today.year - profile.date_of_birth.year - ((today.month, today.day) < (profile.date_of_birth.month, profile.date_of_birth.day))
             context.profile = {
                 "source": "USER_REPORTED",
                 "biological_sex": profile.biological_sex,
                 "weight_kg": profile.weight_kg,
                 "height_cm": profile.height_cm,
-                "activity_level": profile.activity_level
+                "activity_level": profile.activity_level,
+                "age": age,
             }
             
         if "ENERGY" in scopes or "LONGITUDINAL" in scopes:
