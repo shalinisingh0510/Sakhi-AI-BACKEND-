@@ -12,8 +12,8 @@ from app.services.lessons import LessonService
 
 
 class CountingLessonStore(PostgresLessonStore):
-    def __init__(self, session_factory) -> None:
-        super().__init__(session_factory)
+    def __init__(self, pool) -> None:
+        super().__init__(pool)
         self.list_lessons_calls = 0
         self.search_lessons_calls = 0
         self.get_categories_calls = 0
@@ -47,10 +47,9 @@ REGISTER_USER = {
 }
 
 
-def test_lesson_catalog_cache_reuses_reads_until_mutation(tmp_path: Path, test_db_url: str) -> None:
-    database_path = test_db_url
-    settings = Settings(database_path=database_path, cache_ttl_seconds=300)
-    store = CountingLessonStore(database_path)
+def test_lesson_catalog_cache_reuses_reads_until_mutation(tmp_path: Path, test_db_url: str, db_pool_session) -> None:
+    settings = Settings(database_url=test_db_url, cache_ttl_seconds=300)
+    store = CountingLessonStore(db_pool_session)
     service = LessonService(settings, store=store, cache=InMemoryCacheBackend())
 
     first = service.list_lessons()
@@ -70,6 +69,7 @@ def test_lesson_catalog_cache_reuses_reads_until_mutation(tmp_path: Path, test_d
         translations=[],
         sections=[LessonSection(heading="Why caching helps", body="It reduces repeated work.")],
         published=True,
+        created_by_user_id="fake_user",
     )
 
     third = service.list_lessons()
@@ -78,11 +78,9 @@ def test_lesson_catalog_cache_reuses_reads_until_mutation(tmp_path: Path, test_d
     assert any(lesson.slug == "caching-in-practice" for lesson in third)
 
 
-
-def test_lesson_search_uses_store_search_path_and_cache(tmp_path: Path, test_db_url: str) -> None:
-    database_path = test_db_url
-    settings = Settings(database_path=database_path, cache_ttl_seconds=300)
-    store = CountingLessonStore(database_path)
+def test_lesson_search_uses_store_search_path_and_cache(tmp_path: Path, test_db_url: str, db_pool_session) -> None:
+    settings = Settings(database_url=test_db_url, cache_ttl_seconds=300)
+    store = CountingLessonStore(db_pool_session)
     service = LessonService(settings, store=store, cache=InMemoryCacheBackend())
 
     service.create_lesson(
@@ -96,6 +94,7 @@ def test_lesson_search_uses_store_search_path_and_cache(tmp_path: Path, test_db_
         translations=[],
         sections=[LessonSection(heading="Evening wind-down", body="A moonlight pause can help the mind settle.")],
         published=True,
+        created_by_user_id="fake_user",
     )
 
     first = service.list_lessons(search="moonlight")
@@ -107,17 +106,16 @@ def test_lesson_search_uses_store_search_path_and_cache(tmp_path: Path, test_db_
     assert any(lesson.slug == "night-rest-ritual" for lesson in first)
 
 
-def test_analytics_overview_cache_reuses_reads_until_new_event(tmp_path: Path, test_db_url: str) -> None:
-    database_path = test_db_url
-    settings = Settings(database_path=database_path, cache_ttl_seconds=300)
-    auth_store = SQLiteAuthStore(database_path)
+def test_analytics_overview_cache_reuses_reads_until_new_event(tmp_path: Path, test_db_url: str, db_pool_session) -> None:
+    settings = Settings(database_url=test_db_url, cache_ttl_seconds=300)
+    auth_store = PostgresAuthStore(db_pool_session)
     user = auth_store.create_user(
         name=REGISTER_USER["name"],
         email=REGISTER_USER["email"],
         password=REGISTER_USER["password"],
         role="user",
     )
-    store = CountingAnalyticsStore(database_path)
+    store = CountingAnalyticsStore(db_pool_session)
     service = AnalyticsService(settings, store=store, cache=InMemoryCacheBackend())
 
     first = service.get_platform_overview()

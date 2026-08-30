@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -12,6 +12,7 @@ from app.api.dependencies import (
     require_roles,
 )
 from app.schemas.auth import PublicUser, UpdateRoleRequest
+from app.schemas.monetization import SponsorCreate, SponsorUpdate, SponsorResponse, AffiliatePartnerCreate, AffiliatePartnerUpdate, AffiliatePartnerResponse, AffiliateProductCreate, AffiliateProductUpdate, AffiliateProductResponse
 from app.schemas.feedback import FeedbackItem, FeedbackOverview, UpdateFeedbackStatusRequest
 from app.schemas.lesson import CreateLessonRequest, LessonDetail, LessonSummary, UpdateLessonRequest
 from app.schemas.notification import CreateNotificationRequest, NotificationDispatchResult
@@ -20,6 +21,9 @@ from app.services.auth import AuthService, InvalidRoleError, StoredUser, UserNot
 from app.services.feedback import FeedbackNotFoundError, FeedbackService, InvalidFeedbackError
 from app.services.lessons import DuplicateLessonSlugError, InvalidLessonContentError, LessonNotFoundError, LessonService
 from app.services.notifications import NotificationService
+from app.services.monetization_service import MonetizationService
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.api.dependencies import get_db
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 

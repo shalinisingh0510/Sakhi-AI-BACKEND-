@@ -94,10 +94,18 @@ class AnalyticsService:
         event_type: EventType,
         metadata: dict[str, str] | None = None,
     ) -> AnalyticsEvent:
+        safe_metadata = dict(metadata or {})
+        
+        # Privacy & Security (Phase 12): Scrub sensitive health data from analytics
+        sensitive_keys = {"menstrual_status", "pregnancy_status", "health_condition", "last_period"}
+        for k in list(safe_metadata.keys()):
+            if k.lower() in sensitive_keys:
+                del safe_metadata[k]
+                
         record = self._store.create_event(
             user_id=user_id,
             event_type=event_type,
-            metadata=metadata or {},
+            metadata=safe_metadata,
         )
         self._invalidate_cache()
         return record.to_event()
@@ -214,6 +222,9 @@ class AnalyticsService:
         self._cache_set(cache_key, [item.model_dump(mode="json") for item in metrics_list])
         return metrics_list
 
+    def get_rag_metrics(self) -> dict[str, float]:
+        """Get RAG query metrics from the store."""
+        return self._store.get_rag_metrics()
 
     def _cache_version(self) -> int:
         if self._cache is None:
