@@ -21,8 +21,8 @@ REGISTER_ADMIN = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
@@ -65,8 +65,8 @@ def _track_lesson_event(client: TestClient, token: str, *, event_type: str, less
     assert response.status_code == 201
 
 
-def test_recommendations_prefer_matching_language_when_there_is_no_progress(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "recommendations-language.sqlite3")
+def test_recommendations_prefer_matching_language_when_there_is_no_progress(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token = _register_and_token(client, REGISTER_USER)
     admin_token = _register_and_token(client, REGISTER_ADMIN)
     headers = {"Authorization": f"Bearer {user_token}"}
@@ -82,8 +82,8 @@ def test_recommendations_prefer_matching_language_when_there_is_no_progress(tmp_
     assert "preferred language" in recommendations[0]["reason"]
 
 
-def test_recommendations_use_progress_category_and_hide_completed_lessons_by_default(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "recommendations-progress.sqlite3")
+def test_recommendations_use_progress_category_and_hide_completed_lessons_by_default(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token = _register_and_token(client, REGISTER_USER)
     admin_token = _register_and_token(client, REGISTER_ADMIN)
     headers = {"Authorization": f"Bearer {user_token}"}
@@ -114,8 +114,8 @@ def test_recommendations_use_progress_category_and_hide_completed_lessons_by_def
     assert any("review" in item["reason"].lower() for item in review_recommendations if item["lesson"]["slug"] == "cycle-basics")
 
 
-def test_recommendations_use_engagement_history_when_available(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "recommendations-engagement.sqlite3")
+def test_recommendations_use_engagement_history_when_available(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     user_token = _register_and_token(client, REGISTER_USER)
     admin_token = _register_and_token(client, REGISTER_ADMIN)
     headers = {"Authorization": f"Bearer {user_token}"}

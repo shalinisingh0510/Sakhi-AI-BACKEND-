@@ -16,13 +16,13 @@ REGISTER_ADMIN = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
-def test_public_lesson_catalog_exposes_seeded_content(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "seeded-lessons.sqlite3")
+def test_public_lesson_catalog_exposes_seeded_content(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     lessons_response = client.get("/api/v1/lessons")
     assert lessons_response.status_code == 200
@@ -37,8 +37,8 @@ def test_public_lesson_catalog_exposes_seeded_content(tmp_path: Path) -> None:
 
 
 
-def test_public_lesson_search_finds_new_content(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "search-lessons.sqlite3")
+def test_public_lesson_search_finds_new_content(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     admin_response = client.post("/api/v1/auth/register", json=REGISTER_ADMIN)
     assert admin_response.status_code == 201
@@ -72,8 +72,8 @@ def test_public_lesson_search_finds_new_content(tmp_path: Path) -> None:
     assert any(lesson["slug"] == "evening-wind-down" for lesson in results)
 
 
-def test_lesson_can_return_localized_content_and_fallback(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "localized-lessons.sqlite3")
+def test_lesson_can_return_localized_content_and_fallback(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     admin_response = client.post("/api/v1/auth/register", json=REGISTER_ADMIN)
     assert admin_response.status_code == 201
@@ -131,8 +131,8 @@ def test_lesson_can_return_localized_content_and_fallback(tmp_path: Path) -> Non
     assert any(lesson["slug"] == "mindful-breathing" and lesson["title"] == "???? ?????" for lesson in localized_catalog)
 
 
-def test_admin_can_create_update_and_delete_lesson(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "lesson-crud.sqlite3")
+def test_admin_can_create_update_and_delete_lesson(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     admin_response = client.post("/api/v1/auth/register", json=REGISTER_ADMIN)
     assert admin_response.status_code == 201
@@ -198,8 +198,8 @@ def test_admin_can_create_update_and_delete_lesson(tmp_path: Path) -> None:
     assert after_delete_response.status_code == 404
 
 
-def test_lesson_persists_across_app_instances(tmp_path: Path) -> None:
-    database_path = tmp_path / "persisted-lessons.sqlite3"
+def test_lesson_persists_across_app_instances(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
     client_one = build_client(database_path)
 
     admin_response = client_one.post("/api/v1/auth/register", json=REGISTER_ADMIN)

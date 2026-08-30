@@ -15,13 +15,13 @@ REGISTER_USER = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
-def test_user_can_change_password(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "pw-change.sqlite3")
+def test_user_can_change_password(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert register_response.status_code == 201
@@ -54,8 +54,8 @@ def test_user_can_change_password(tmp_path: Path) -> None:
     assert new_login.json()["user"]["email"] == REGISTER_USER["email"]
 
 
-def test_change_password_rejects_wrong_current_password(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "pw-wrong.sqlite3")
+def test_change_password_rejects_wrong_current_password(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert register_response.status_code == 201
@@ -74,8 +74,8 @@ def test_change_password_rejects_wrong_current_password(tmp_path: Path) -> None:
     assert "incorrect" in change_response.json()["detail"].lower()
 
 
-def test_change_password_rejects_same_password(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "pw-same.sqlite3")
+def test_change_password_rejects_same_password(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert register_response.status_code == 201
@@ -94,8 +94,8 @@ def test_change_password_rejects_same_password(tmp_path: Path) -> None:
     assert "different" in change_response.json()["detail"].lower()
 
 
-def test_change_password_requires_authentication(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "pw-unauth.sqlite3")
+def test_change_password_requires_authentication(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     change_response = client.post(
         "/api/v1/auth/me/change-password",
@@ -107,8 +107,8 @@ def test_change_password_requires_authentication(tmp_path: Path) -> None:
     assert change_response.status_code == 401
 
 
-def test_password_change_persists_across_app_instances(tmp_path: Path) -> None:
-    database_path = tmp_path / "pw-persist.sqlite3"
+def test_password_change_persists_across_app_instances(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
     client = build_client(database_path)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)

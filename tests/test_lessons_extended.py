@@ -16,8 +16,8 @@ REGISTER_ADMIN = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
@@ -51,8 +51,8 @@ def _create_lesson(client: TestClient, token: str, *, title: str, slug: str, tag
 # Tag filtering
 # ---------------------------------------------------------------------------
 
-def test_filter_lessons_by_tag_returns_matching(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "tag-filter.sqlite3")
+def test_filter_lessons_by_tag_returns_matching(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _admin_token(client)
 
     _create_lesson(client, token, title="Breathing Exercise", slug="breathing", tags=["breathing", "calm"])
@@ -68,8 +68,8 @@ def test_filter_lessons_by_tag_returns_matching(tmp_path: Path) -> None:
     assert "nutrition" not in slugs
 
 
-def test_filter_lessons_by_tag_is_case_insensitive(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "tag-case.sqlite3")
+def test_filter_lessons_by_tag_is_case_insensitive(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _admin_token(client)
     _create_lesson(client, token, title="Health Basics", slug="health-basics", tags=["Health", "Basics"])
 
@@ -79,8 +79,8 @@ def test_filter_lessons_by_tag_is_case_insensitive(tmp_path: Path) -> None:
     assert "health-basics" in slugs
 
 
-def test_filter_lessons_by_nonexistent_tag_returns_empty(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "tag-none.sqlite3")
+def test_filter_lessons_by_nonexistent_tag_returns_empty(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     resp = client.get("/api/v1/lessons?tag=does-not-exist-xyz")
     assert resp.status_code == 200
@@ -88,8 +88,8 @@ def test_filter_lessons_by_nonexistent_tag_returns_empty(tmp_path: Path) -> None
     assert resp.json() == []
 
 
-def test_tag_filter_combines_with_category_filter(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "tag-category.sqlite3")
+def test_tag_filter_combines_with_category_filter(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _admin_token(client)
 
     _create_lesson(client, token, title="Yoga Basics", slug="yoga-basics-a", tags=["yoga"])
@@ -106,8 +106,8 @@ def test_tag_filter_combines_with_category_filter(tmp_path: Path) -> None:
     assert resp2.json() == []
 
 
-def test_admin_lesson_list_also_supports_tag_filter(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "tag-admin.sqlite3")
+def test_admin_lesson_list_also_supports_tag_filter(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _admin_token(client)
     admin_headers = {"Authorization": f"Bearer {token}"}
 
@@ -125,16 +125,16 @@ def test_admin_lesson_list_also_supports_tag_filter(tmp_path: Path) -> None:
 # Access log middleware
 # ---------------------------------------------------------------------------
 
-def test_access_log_middleware_adds_request_id_header(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "access-log.sqlite3")
+def test_access_log_middleware_adds_request_id_header(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     resp = client.get("/api/v1/health")
     assert resp.status_code == 200
     assert "X-Request-Id" in resp.headers
     assert len(resp.headers["X-Request-Id"]) > 0
 
 
-def test_request_id_is_unique_per_request(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "access-log-unique.sqlite3")
+def test_request_id_is_unique_per_request(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     ids = set()
     for _ in range(5):
         resp = client.get("/api/v1/health")
@@ -143,8 +143,8 @@ def test_request_id_is_unique_per_request(tmp_path: Path) -> None:
     assert len(ids) == 5
 
 
-def test_access_log_present_on_post_endpoints(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "access-log-post.sqlite3")
+def test_access_log_present_on_post_endpoints(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     resp = client.post(
         "/api/v1/auth/register",
         json={

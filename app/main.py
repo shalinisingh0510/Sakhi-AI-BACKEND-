@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
@@ -83,7 +83,7 @@ def create_app(
 
         db_pool = ConnectionPool(
             settings.database_url,
-            kwargs={"connect_timeout": 10},
+            kwargs={"connect_timeout": 10, "autocommit": True},
             check=ConnectionPool.check_connection,
         )
         app.state.db_pool = db_pool

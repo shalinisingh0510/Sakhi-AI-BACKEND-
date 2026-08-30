@@ -9,13 +9,13 @@ from app.core.middleware import enable_rate_limiting
 from app.main import create_app
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
-def test_security_headers_are_present(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "headers.sqlite3")
+def test_security_headers_are_present(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     response = client.get("/api/v1/health")
     assert response.status_code == 200
@@ -29,11 +29,11 @@ def test_security_headers_are_present(tmp_path: Path) -> None:
     assert "Permissions-Policy" in response.headers
 
 
-def test_rate_limiting_when_enabled(tmp_path: Path) -> None:
+def test_rate_limiting_when_enabled(tmp_path: Path, test_db_url: str) -> None:
     # Enable rate limiting for this test
     enable_rate_limiting(True)
     
-    client = build_client(tmp_path / "rate-limit.sqlite3")
+    client = build_client(test_db_url)
 
     # Register a user to get a token for authenticated requests
     register_response = client.post(
@@ -62,10 +62,10 @@ def test_rate_limiting_when_enabled(tmp_path: Path) -> None:
     enable_rate_limiting(False)
 
 
-def test_rate_limiting_headers(tmp_path: Path) -> None:
+def test_rate_limiting_headers(tmp_path: Path, test_db_url: str) -> None:
     enable_rate_limiting(True)
     
-    client = build_client(tmp_path / "rate-headers.sqlite3")
+    client = build_client(test_db_url)
 
     # Register a user to get a token for authenticated requests
     register_response = client.post(
@@ -91,10 +91,10 @@ def test_rate_limiting_headers(tmp_path: Path) -> None:
     enable_rate_limiting(False)
 
 
-def test_health_endpoint_bypasses_rate_limiting(tmp_path: Path) -> None:
+def test_health_endpoint_bypasses_rate_limiting(tmp_path: Path, test_db_url: str) -> None:
     enable_rate_limiting(True)
     
-    client = build_client(tmp_path / "health-bypass.sqlite3")
+    client = build_client(test_db_url)
 
     # Root endpoint should bypass rate limiting
     for _ in range(100):
@@ -109,8 +109,8 @@ def test_health_endpoint_bypasses_rate_limiting(tmp_path: Path) -> None:
     enable_rate_limiting(False)
 
 
-def test_request_size_limit(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "size-limit.sqlite3")
+def test_request_size_limit(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     # Try to send a request with content-length header exceeding limit
     large_data = "x" * (11 * 1024 * 1024)  # 11 MB
@@ -130,8 +130,8 @@ def test_request_size_limit(tmp_path: Path) -> None:
     # This test verifies the middleware is in place
 
 
-def test_security_headers_on_authenticated_endpoint(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "auth-headers.sqlite3")
+def test_security_headers_on_authenticated_endpoint(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     response = client.post(
         "/api/v1/auth/register",
@@ -148,10 +148,10 @@ def test_security_headers_on_authenticated_endpoint(tmp_path: Path) -> None:
     assert response.headers.get("X-Frame-Options") == "DENY"
 
 
-def test_rate_limiting_uses_different_identifiers_for_different_users(tmp_path: Path) -> None:
+def test_rate_limiting_uses_different_identifiers_for_different_users(tmp_path: Path, test_db_url: str) -> None:
     enable_rate_limiting(True)
     
-    client = build_client(tmp_path / "user-identifiers.sqlite3")
+    client = build_client(test_db_url)
 
     # Register first user
     user1_response = client.post(
@@ -202,8 +202,8 @@ def test_rate_limiting_uses_different_identifiers_for_different_users(tmp_path: 
     enable_rate_limiting(False)
 
 
-def test_permissions_policy_restricts_sensitive_features(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "permissions.sqlite3")
+def test_permissions_policy_restricts_sensitive_features(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     response = client.get("/api/v1/health")
     assert response.status_code == 200
@@ -216,8 +216,8 @@ def test_permissions_policy_restricts_sensitive_features(tmp_path: Path) -> None
     assert "camera=()" in permissions_policy
 
 
-def test_hsts_header_is_present(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "hsts.sqlite3")
+def test_hsts_header_is_present(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     response = client.get("/api/v1/health")
     assert response.status_code == 200
@@ -229,8 +229,8 @@ def test_hsts_header_is_present(tmp_path: Path) -> None:
     assert "includeSubDomains" in hsts_header
 
 
-def test_referrer_policy_is_strict(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "referrer.sqlite3")
+def test_referrer_policy_is_strict(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     response = client.get("/api/v1/health")
     assert response.status_code == 200
