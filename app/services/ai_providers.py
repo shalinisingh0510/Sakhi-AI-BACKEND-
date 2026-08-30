@@ -159,6 +159,7 @@ class OpenAIProvider:
             self._client = None  # type: ignore[assignment]
         self._model = model
         self._fallback = RuleBasedProvider()
+        self._supports_structured_outputs = True
 
     def generate_reply(
         self,
@@ -202,7 +203,7 @@ class OpenAIProvider:
 
         try:
             # Check if using the beta parse method for Structured Outputs
-            if hasattr(self._client.beta.chat.completions, 'parse'):
+            if hasattr(self._client.beta.chat.completions, 'parse') and self._supports_structured_outputs:
                 response = self._client.beta.chat.completions.parse(
                     model=self._model,
                     messages=messages,  # type: ignore[arg-type]
@@ -260,6 +261,7 @@ class GroqProvider(OpenAIProvider):
     """Calls the Groq API using the OpenAI SDK."""
     def __init__(self, api_key: str, model: str = "llama3-8b-8192") -> None:
         super().__init__(api_key=api_key, model=model, base_url="https://api.groq.com/openai/v1")
+        self._supports_structured_outputs = False
 
 
 # ---------------------------------------------------------------------------
