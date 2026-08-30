@@ -254,6 +254,78 @@ class LearningService:
             or 0
         )
 
+        from app.models.learning import Topic, LearningModule, LearningModuleItem, LearningPath
+
+        # Topics explored
+        topics_explored_list = self._db.scalars(
+            select(Topic.name)
+            .join(LearningContent, LearningContent.topic_id == Topic.id)
+            .join(LearningProgress, LearningContent.id == LearningProgress.content_id)
+            .where(LearningProgress.user_id == user_id)
+            .distinct()
+            .limit(5)
+        ).all()
+        topics_explored = list(topics_explored_list)
+
+        # Favorite format
+        favorite_format = self._db.scalar(
+            select(LearningContent.content_type)
+            .join(LearningProgress, LearningContent.id == LearningProgress.content_id)
+            .where(LearningProgress.user_id == user_id)
+            .group_by(LearningContent.content_type)
+            .order_by(func.count(LearningContent.content_type).desc())
+            .limit(1)
+        )
+
+        # Paths Started
+        paths_started = self._db.scalar(
+            select(func.count(func.distinct(LearningPath.id)))
+            .join(LearningModule, LearningModule.path_id == LearningPath.id)
+            .join(LearningModuleItem, LearningModuleItem.module_id == LearningModule.id)
+            .join(LearningProgress, LearningProgress.content_id == LearningModuleItem.content_id)
+            .where(
+                and_(
+                    LearningProgress.user_id == user_id,
+                    LearningProgress.progress_percent > 0
+                )
+            )
+        ) or 0
+
+        # Paths Completed
+        total_items_sq = (
+            select(
+                LearningPath.id.label("path_id"),
+                func.count(LearningModuleItem.id).label("total_items")
+            )
+            .join(LearningModule, LearningModule.path_id == LearningPath.id)
+            .join(LearningModuleItem, LearningModuleItem.module_id == LearningModule.id)
+            .group_by(LearningPath.id)
+        ).subquery()
+
+        completed_items_sq = (
+            select(
+                LearningPath.id.label("path_id"),
+                func.count(LearningModuleItem.id).label("completed_items")
+            )
+            .join(LearningModule, LearningModule.path_id == LearningPath.id)
+            .join(LearningModuleItem, LearningModuleItem.module_id == LearningModule.id)
+            .join(LearningProgress, LearningProgress.content_id == LearningModuleItem.content_id)
+            .where(
+                and_(
+                    LearningProgress.user_id == user_id,
+                    LearningProgress.completed.is_(True)
+                )
+            )
+            .group_by(LearningPath.id)
+        ).subquery()
+
+        paths_completed = self._db.scalar(
+            select(func.count(total_items_sq.c.path_id))
+            .join(completed_items_sq, total_items_sq.c.path_id == completed_items_sq.c.path_id)
+            .where(total_items_sq.c.total_items == completed_items_sq.c.completed_items)
+            .where(total_items_sq.c.total_items > 0)
+        ) or 0
+
         # Count videos watched (completed video content)
         videos_watched = (
             self._db.scalar(
@@ -327,6 +399,10 @@ class LearningService:
             "learning_minutes": watch_time // 60,
             "videos_watched": videos_watched,
             "articles_read": articles_read,
+            "paths_started": paths_started,
+            "paths_completed": paths_completed,
+            "topics_explored": topics_explored,
+            "favorite_format": favorite_format,
             "continue_learning": continue_learning,
             "streak": streak,
             "badges": badges,
@@ -390,6 +466,12 @@ class LearningService:
     ) -> LearningProgress:
         progress = self._db.get(LearningProgress, (user_id, content_id))
         now = datetime.utcnow()
+        
+        # Meaningful learning time: cap watch_time_seconds to the actual duration + buffer
+        content = self._db.get(LearningContent, content_id)
+        if content and content.duration_minutes > 0:
+            max_allowed_seconds = (content.duration_minutes * 60) + 300 # 5 min buffer
+            watch_time_seconds = min(watch_time_seconds, max_allowed_seconds)
 
         if not progress:
             progress = LearningProgress(
@@ -404,7 +486,7 @@ class LearningService:
             )
             self._db.add(progress)
         else:
-            if watch_time_seconds > 0:
+            if watch_time_seconds > progress.watch_time_seconds:
                 progress.watch_time_seconds = watch_time_seconds
             if progress_percent > progress.progress_percent:
                 progress.progress_percent = progress_percent
@@ -424,7 +506,10 @@ class LearningService:
         # Trigger gamification check-in for meaningful learning activity
         try:
             from app.services.gamification_service import GamificationService
-            GamificationService(self._db).record_checkin(user_id, now.date())
+            gamification = GamificationService(self._db)
+            gamification.record_checkin(user_id, now.date())
+            if completed:
+                gamification.evaluate_learning_badges(user_id)
         except Exception:
             pass
             

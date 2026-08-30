@@ -221,6 +221,10 @@ class LearningContent(Base):
     medical_reviewer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     medical_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # Phase 10: Sponsorship
+    sponsor_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("sponsors.id", ondelete="SET NULL"), nullable=True)
+    sponsor: Mapped["Sponsor"] = relationship("Sponsor", lazy="joined")
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, server_default=func.now()
@@ -249,6 +253,7 @@ class LearningContent(Base):
         Index("ix_learning_content_audience", "audience"),
         Index("ix_learning_content_published_at", "published_at"),
         Index("ix_learning_content_medical_review", "medical_review_status"),
+        Index("ix_learning_content_sponsor_id", "sponsor_id"),
     )
 
 

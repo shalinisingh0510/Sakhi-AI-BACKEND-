@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from app.schemas.monetization import SponsorResponse
 
 # ---------------------------------------------------------------------------
 # Literal types
@@ -239,6 +240,10 @@ class LearningContentResponse(BaseModel):
     medical_reviewer_id: Optional[str] = None
     medical_reviewed_at: Optional[datetime] = None
 
+    # Phase 10: Sponsorship
+    sponsor_id: Optional[str] = None
+    sponsor: Optional[SponsorResponse] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -298,6 +303,10 @@ class LearningSummaryResponse(BaseModel):
     learning_minutes: int
     articles_read: int = 0
     videos_watched: int = 0
+    paths_started: int = 0
+    paths_completed: int = 0
+    topics_explored: List[str] = Field(default_factory=list)
+    favorite_format: Optional[str] = None
     continue_learning: Optional[LearningContentResponse] = None
     streak: Optional[StreakResponse] = None
     badges: List[BadgeResponse] = Field(default_factory=list)
