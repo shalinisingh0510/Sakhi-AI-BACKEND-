@@ -166,7 +166,7 @@ class PostgresAnalyticsStore:
         with self._pool.connection() as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 total_users_row = cursor.execute(
-                    "SELECT COUNT(*) AS count FROM users WHERE is_deleted = false"
+                    "SELECT COUNT(*) AS count FROM users WHERE is_deleted = 0"
                 ).fetchone()
                 total_users = int(total_users_row["count"]) if total_users_row else 0
 
@@ -296,11 +296,38 @@ class PostgresAnalyticsStore:
             last_activity = datetime.fromisoformat(row["last_activity"])
             if last_activity.tzinfo is None:
                 last_activity = last_activity.replace(tzinfo=timezone.utc)
-
+            
             top_users.append({
                 "user_id": row["user_id"],
-                "total_events": int(row["total_events"]),
+                "total_events": row["total_events"],
                 "last_activity": last_activity,
             })
-
+        
         return top_users
+
+    def get_rag_metrics(self) -> dict[str, float]:
+        with self._pool.connection() as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                # Count total rag_query events
+                total_queries_row = cursor.execute(
+                    "SELECT COUNT(*) AS count FROM analytics_events WHERE event_type = 'rag_query'"
+                ).fetchone()
+                total_queries = int(total_queries_row["count"])
+
+                # Average latency from metadata
+                # Assuming metadata_json contains {"latency": 0.45, "chunks_returned": 3}
+                avg_latency_row = cursor.execute(
+                    "SELECT AVG((metadata_json->>'latency')::numeric) as avg_latency FROM analytics_events WHERE event_type = 'rag_query'"
+                ).fetchone()
+                avg_latency = float(avg_latency_row["avg_latency"]) if avg_latency_row and avg_latency_row["avg_latency"] is not None else 0.0
+                
+                successful_retrievals_row = cursor.execute(
+                    "SELECT COUNT(*) AS count FROM analytics_events WHERE event_type = 'rag_query' AND (metadata_json->>'chunks_returned')::int > 0"
+                ).fetchone()
+                successful_retrievals = int(successful_retrievals_row["count"])
+
+                return {
+                    "total_queries": total_queries,
+                    "avg_latency": avg_latency,
+                    "successful_retrievals": successful_retrievals,
+                }

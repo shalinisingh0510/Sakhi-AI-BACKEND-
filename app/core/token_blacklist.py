@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 import math
@@ -70,18 +70,29 @@ class RedisTokenBlacklist:
         return f"{self._key_prefix}:{jti.strip()}"
 
     def revoke(self, jti: str, expires_at: float) -> None:
-        ttl_seconds = int(math.ceil(expires_at - time.time()))
-        if ttl_seconds <= 0:
-            return
-        self._client.set(self._key(jti), "1", ex=ttl_seconds)
+        try:
+            ttl_seconds = int(math.ceil(expires_at - time.time()))
+            if ttl_seconds <= 0:
+                return
+            self._client.set(self._key(jti), "1", ex=ttl_seconds)
+        except Exception as exc:
+            logger.warning(f"Failed to revoke token in Redis (JTI: {jti}): {exc}")
 
     def is_revoked(self, jti: str) -> bool:
-        return bool(self._client.exists(self._key(jti)))
+        try:
+            return bool(self._client.exists(self._key(jti)))
+        except Exception as exc:
+            logger.warning(f"Failed to check token revocation in Redis (JTI: {jti}): {exc}")
+            return False  # Fail open to allow request if Redis is down
 
     @property
     def size(self) -> int:
-        pattern = f"{self._key_prefix}:*"
-        return sum(1 for _ in self._client.scan_iter(match=pattern))
+        try:
+            pattern = f"{self._key_prefix}:*"
+            return sum(1 for _ in self._client.scan_iter(match=pattern))
+        except Exception as exc:
+            logger.warning(f"Failed to get Redis blacklist size: {exc}")
+            return 0
 
 
 def build_token_blacklist(

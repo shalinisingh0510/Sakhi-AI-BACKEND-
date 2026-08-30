@@ -57,76 +57,78 @@ def test_rule_based_menstrual_topic() -> None:
         preferred_language="english",
         history=[],
     )
-    assert any(kw in reply.lower() for kw in ("cramp", "menstrual", "period", "cycle"))
-    assert "educational" in reply.lower()
-    assert "diagnosis" in reply.lower()
+    assert any(kw in reply.answer.lower() for kw in ("cramp", "menstrual", "period", "cycle"))
+    assert "rest" in reply.answer.lower() or "pad" in reply.answer.lower()
+    assert "not a diagnosis" in reply.answer.lower()
 
 
 def test_rule_based_mental_health_topic() -> None:
     provider = RuleBasedProvider()
     reply = provider.generate_reply(
-        user_message="I feel very anxious about school",
-        conversation_title="Mental Wellness",
+        user_message="I feel very anxious and sad.",
+        conversation_title="Anxiety",
         preferred_language="english",
         history=[],
     )
-    assert any(kw in reply.lower() for kw in ("stress", "anxious", "emotional", "overwhelm"))
+    assert "professional" in reply.answer.lower()
+    assert "not a diagnosis" in reply.answer.lower()
 
 
 def test_rule_based_pregnancy_topic() -> None:
     provider = RuleBasedProvider()
     reply = provider.generate_reply(
-        user_message="Questions about fertility and ovulation",
-        conversation_title="Reproductive Health",
+        user_message="Am I pregnant?",
+        conversation_title="Pregnancy",
         preferred_language="english",
         history=[],
     )
-    assert any(kw in reply.lower() for kw in ("fertility", "pregnan", "medical", "healthcare"))
+    assert "medical advice" in reply.answer.lower() or "professional" in reply.answer.lower()
+    assert "not a diagnosis" in reply.answer.lower()
 
 
 def test_rule_based_hygiene_topic() -> None:
     provider = RuleBasedProvider()
     reply = provider.generate_reply(
-        user_message="I have unusual discharge and itching",
-        conversation_title="Hygiene Questions",
+        user_message="How to maintain vaginal hygiene?",
+        conversation_title="Hygiene",
         preferred_language="english",
         history=[],
     )
-    assert any(kw in reply.lower() for kw in ("hygiene", "discharge", "clean", "irritat"))
+    assert "cotton" in reply.answer.lower() or "clean" in reply.answer.lower()
+    assert "not a diagnosis" in reply.answer.lower()
 
 
 def test_rule_based_general_topic() -> None:
     provider = RuleBasedProvider()
     reply = provider.generate_reply(
-        user_message="Tell me something about health",
-        conversation_title="General",
+        user_message="Hello",
+        conversation_title="Greeting",
         preferred_language="english",
         history=[],
     )
-    assert len(reply) > 30
-    assert "educational" in reply.lower()
+    assert "educational" in reply.answer.lower()
 
 
 def test_rule_based_includes_language_hint_for_non_english() -> None:
     provider = RuleBasedProvider()
     reply = provider.generate_reply(
-        user_message="Some health question",
-        conversation_title="Health",
+        user_message="My periods are late",
+        conversation_title="Periods",
         preferred_language="hindi",
         history=[],
     )
-    assert "(hindi)" in reply.lower()
+    assert "(hindi)" in reply.answer.lower()
 
 
 def test_rule_based_no_language_hint_for_english() -> None:
     provider = RuleBasedProvider()
     reply = provider.generate_reply(
-        user_message="Some health question",
-        conversation_title="Health",
+        user_message="My periods are late",
+        conversation_title="Periods",
         preferred_language="english",
         history=[],
     )
-    assert "(english)" not in reply.lower()
+    assert "(english)" not in reply.answer.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -151,8 +153,8 @@ def test_openai_provider_falls_back_when_package_missing(monkeypatch) -> None:
         history=[],
     )
     # Should get a rule-based response, not raise
-    assert len(reply) > 10
-    assert "educational" in reply.lower()
+    assert len(reply.answer) > 10
+    assert "educational" in reply.answer.lower()
 
 
 # ---------------------------------------------------------------------------

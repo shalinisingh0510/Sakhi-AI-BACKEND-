@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     enable_context_compression: bool = True
     enable_freshness_ranking: bool = True
 
+    # Monetization (Phase 9)
+    public_ads_enabled: bool = False
+    adsense_publisher_id: str | None = None
+    ad_manager_network_id: str | None = None
+
     model_config = SettingsConfigDict(
         env_prefix="SAKHI_",
         env_file=".env",
