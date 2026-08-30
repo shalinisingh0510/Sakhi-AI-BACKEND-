@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.analytics import router as analytics_router
 from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.chat import router as chat_router
 from app.api.v1.endpoints.conversations import router as conversations_router
 from app.api.v1.endpoints.feedback import router as feedback_router
 from app.api.v1.endpoints.health import router as health_router
@@ -24,6 +25,9 @@ from app.api.v1.endpoints.wellness_plans import router as wellness_plans_router
 from app.api.v1.endpoints.integrations import router as integrations_router
 from app.api.v1.endpoints.food_vision import router as food_vision_router
 from app.api.v1.endpoints.insights import router as insights_router
+from app.api.v1.endpoints.subscriptions import router as subscriptions_router
+from app.api.v1.endpoints.admin_rag import router as admin_rag_router
+from app.api.v1.endpoints.learning import router as learning_router
 
 api_router = APIRouter()
 api_router.include_router(nutrition_router, prefix="/api/v1")
@@ -39,6 +43,7 @@ api_router.include_router(insights_router, prefix="/api/v1")
 api_router.include_router(health_router, prefix="/api/v1")
 api_router.include_router(health_profile_router, prefix="/api/v1")
 api_router.include_router(auth_router, prefix="/api/v1")
+api_router.include_router(chat_router, prefix="/api/v1/chat")
 api_router.include_router(conversations_router, prefix="/api/v1")
 api_router.include_router(lessons_router, prefix="/api/v1")
 api_router.include_router(feedback_router, prefix="/api/v1")
@@ -50,3 +55,6 @@ api_router.include_router(analytics_router, prefix="/api/v1")
 api_router.include_router(admin_router, prefix="/api/v1")
 api_router.include_router(media_router, prefix="/api/v1")
 api_router.include_router(ws_router, prefix="/api/v1")
+api_router.include_router(subscriptions_router, prefix="/api/v1")
+api_router.include_router(admin_rag_router, prefix="/api/v1")
+api_router.include_router(learning_router, prefix="/api/v1")

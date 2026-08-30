@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.requests import Request
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_roles
 from app.schemas.media import MediaResponse, MediaUploadRequest, MediaUploadResponse
 from app.services.auth import StoredUser
 from app.services.media import MediaNotFoundError, MediaService
@@ -23,7 +23,7 @@ def get_media_service(request: Request) -> MediaService:
 )
 def generate_presigned_url(
     payload: MediaUploadRequest,
-    current_user: StoredUser = Depends(get_current_user),
+    current_user: StoredUser = Depends(require_roles("admin")),
     media_service: MediaService = Depends(get_media_service),
 ) -> Any:
     """
@@ -55,7 +55,7 @@ def generate_presigned_url(
     summary="List user's uploaded media",
 )
 def list_media(
-    current_user: StoredUser = Depends(get_current_user),
+    current_user: StoredUser = Depends(require_roles("admin")),
     media_service: MediaService = Depends(get_media_service),
 ) -> Any:
     """

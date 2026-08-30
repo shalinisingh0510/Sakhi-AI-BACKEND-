@@ -173,3 +173,27 @@ async def access_log_middleware(request: Request, call_next: Callable) -> JSONRe
     )
     response.headers["X-Request-Id"] = request_id
     return response
+
+
+async def global_exception_handler(request: Request, call_next: Callable) -> JSONResponse:
+    """
+    Outermost error-catching middleware.
+    Catches any unhandled exception (including database errors, AttributeError, etc.)
+    and returns a safe JSON 500 response.  Never leaks stack traces to clients.
+    """
+    _error_logger = _logging.getLogger("sakhi.errors")
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        _error_logger.exception(
+            "Unhandled exception on %s %s: %s",
+            request.method,
+            request.url.path,
+            type(exc).__name__,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "detail": "An internal error occurred. Please try again later.",
+            },
+        )

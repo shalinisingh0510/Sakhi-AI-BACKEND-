@@ -12,7 +12,7 @@ gunicorn>=21.0,<23.0
 # Optional: enable AI providers
 # Uncomment the line below or install with: pip install "sakhi-ai-backend[ai]"
 openai>=1.30,<2.0
-google-generativeai>=0.8.0,<1.0
+google-genai>=0.2.0
 
 # Database ORM and migrations (Phase 0)
 sqlalchemy>=2.0,<3.0
@@ -27,3 +27,10 @@ pgvector>=0.2,<1.0
 # Image Processing (Phase 14)
 Pillow>=10.0,<11.0
 python-multipart>=0.0.9,<1.0
+
+# Observability and Telemetry
+sentry-sdk[fastapi]>=2.0,<3.0
+prometheus-fastapi-instrumentator>=7.0,<8.0
+
+# Testing
+httpx-sse>=0.4,<1.0

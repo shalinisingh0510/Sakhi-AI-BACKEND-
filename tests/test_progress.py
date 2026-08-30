@@ -15,13 +15,13 @@ REGISTER_USER = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
-def test_user_can_track_progress_and_resume_after_restart(tmp_path: Path) -> None:
-    database_path = tmp_path / "progress.sqlite3"
+def test_user_can_track_progress_and_resume_after_restart(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
     client = build_client(database_path)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)

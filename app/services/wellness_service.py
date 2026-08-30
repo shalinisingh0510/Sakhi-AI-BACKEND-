@@ -63,7 +63,9 @@ class WellnessService:
         if not profile:
             raise HTTPException(404, "Health profile required.")
 
-        gate = HealthPrivacyGate.from_profile(profile)
+        gate = HealthPrivacyGate.from_profile(
+            authenticated_user_id=user_id, profile=profile
+        )
         gate.assert_owner(user_id)
 
         age_policy = AgePolicy.from_dob(profile.date_of_birth)
@@ -75,7 +77,7 @@ class WellnessService:
         # The prompt says: use centralised feature policy. If missing, we assume HealthHub availability = True.
         
         # We don't have SYMPTOM_TRACKING explicitly in the old phase 1 policy mock, so we just check basic access.
-        if not age_policy.can_use_health_hub():
+        if not age_policy.is_health_hub_allowed():
             raise HTTPException(403, "Health hub is restricted by age policy.")
 
         return profile
@@ -152,6 +154,11 @@ class WellnessService:
                     self._energy_repo.add(new_energy)
                     energy_resp = new_energy
                     
+            # Process Gamification (XP/Streaks)
+            from app.services.gamification_service import GamificationService
+            gamification = GamificationService(self._session)
+            gamification.record_checkin(user_id, data.log_date)
+
             # Process Symptoms (delete old for this date and insert new, or just insert new)
             # Simplest flow: clear today's symptoms and add the new ones in the checkin.
             existing_symptoms = self._symptom_repo.list_by_profile_and_date(profile.id, data.log_date)
@@ -176,6 +183,12 @@ class WellnessService:
                 symptom_resps.append(new_symptom)
 
             self._session.flush()
+            if mood_resp:
+                self._session.refresh(mood_resp)
+            if energy_resp:
+                self._session.refresh(energy_resp)
+            for s in symptom_resps:
+                self._session.refresh(s)
 
         logger.info(f"User {user_id} submitted daily check-in for {data.log_date}")
         

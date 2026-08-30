@@ -18,6 +18,7 @@ from .auth import (
     UpdateProfileRequest,
     UpdateRoleRequest,
 )
+from .chat import ChatMessageContent, ChatMessageData, ChatMessageRequest, ChatMessageResponse
 from .feedback import FeedbackCategory, FeedbackItem, FeedbackOverview, FeedbackStatus, SubmitFeedbackRequest, UpdateFeedbackStatusRequest
 from .lesson import CreateLessonRequest, LessonDetail, LessonSection, LessonSummary, LessonTranslationRequest, UpdateLessonRequest
 from .notification import (
@@ -34,6 +35,10 @@ __all__ = [
     "AnalyticsEvent",
     "AnalyticsReport",
     "AuthResponse",
+    "ChatMessageContent",
+    "ChatMessageData",
+    "ChatMessageRequest",
+    "ChatMessageResponse",
     "ConversationDetail",
     "ConversationMessage",
     "ConversationSummary",
