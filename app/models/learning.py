@@ -216,6 +216,11 @@ class LearningContent(Base):
     is_short_form: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     duration_minutes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
+    # Phase 8: Medical Trust
+    medical_review_status: Mapped[str] = mapped_column(String(20), default="NOT_REVIEWED", server_default="NOT_REVIEWED", nullable=False)
+    medical_reviewer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    medical_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, server_default=func.now()
@@ -243,6 +248,32 @@ class LearningContent(Base):
         Index("ix_learning_content_language", "language"),
         Index("ix_learning_content_audience", "audience"),
         Index("ix_learning_content_published_at", "published_at"),
+        Index("ix_learning_content_medical_review", "medical_review_status"),
+    )
+
+
+class ContentReview(Base):
+    """Phase 8: Audit log and current status of medical review for a piece of content."""
+    __tablename__ = "content_reviews"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    content_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("learning_content.id", ondelete="CASCADE"), nullable=False
+    )
+    reviewer_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_content_reviews_content_id", "content_id"),
+        Index("ix_content_reviews_reviewer_id", "reviewer_id"),
     )
 
 

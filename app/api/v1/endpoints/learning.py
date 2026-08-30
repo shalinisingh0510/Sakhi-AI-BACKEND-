@@ -41,14 +41,17 @@ from app.schemas.learning import (
     LearningProgressUpdate,
     LearningSummaryResponse,
     LearningHistoryResponse,
+    MedicalReviewRequest,
     TopicResponse,
     TopicsListResponse,
     LearningPathListResponse,
     LearningPathResponse,
     LearningPathProgressResponse,
+    RecommendationListResponse,
 )
 from app.services.auth import StoredUser
 from app.services.learning_service import LearningContentNotFoundError, TopicNotFoundError, LearningService
+from app.services.learning_recommendations import LearningRecommendationService
 from app.models.health_profile import HealthProfile
 from datetime import date
 from sqlalchemy import select
@@ -58,6 +61,12 @@ router = APIRouter(tags=["learning"])
 
 def get_learning_service(request: Request, db: Session = Depends(get_db)) -> LearningService:
     return LearningService(db, storage_service=request.app.state.storage_service)
+
+def get_learning_recommendation_service(
+    db: Session = Depends(get_db), 
+    learning_service: LearningService = Depends(get_learning_service)
+) -> LearningRecommendationService:
+    return LearningRecommendationService(db, learning_service)
 
 def get_learning_context(
     current_user: StoredUser = Depends(get_current_user),
@@ -229,6 +238,36 @@ def get_progress_summary(
     service: LearningService = Depends(get_learning_service),
 ) -> Any:
     return service.get_user_progress_summary(current_user.id)
+
+# ---------------------------------------------------------------------------
+# Recommendations Endpoints (Phase 7)
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/learning/recommendations",
+    response_model=RecommendationListResponse,
+    summary="Get personalized content recommendations",
+)
+def get_recommendations(
+    limit: int = Query(10, ge=1, le=50),
+    include_completed: bool = Query(False),
+    current_user: StoredUser = Depends(get_current_user),
+    service: LearningRecommendationService = Depends(get_learning_recommendation_service),
+    ctx: dict = Depends(get_learning_context),
+) -> Any:
+    items = service.get_recommendations(
+        user_id=current_user.id,
+        preferred_language=ctx["language"],
+        audience=ctx["audience"],
+        limit=limit,
+        include_completed=include_completed,
+    )
+    return {
+        "items": items,
+        "total": len(items),
+        "page": 1,
+        "page_size": limit,
+    }
 
 # ---------------------------------------------------------------------------
 # Learning Paths Endpoints (Phase 5)
@@ -537,6 +576,30 @@ def update_learning_content(
 ) -> Any:
     try:
         return service.update_content(content_id, body.model_dump(exclude_unset=True))
+    except LearningContentNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+
+
+@router.post(
+    "/admin/learning/{content_id}/review",
+    response_model=LearningContentResponse,
+    summary="[Admin/Reviewer] Update medical review status",
+)
+def update_medical_review_status(
+    content_id: str,
+    body: MedicalReviewRequest,
+    current_user: StoredUser = Depends(require_roles("admin")),
+    service: LearningService = Depends(get_learning_service),
+) -> Any:
+    try:
+        return service.update_medical_review(
+            content_id=content_id,
+            reviewer_id=current_user.id,
+            status=body.status,
+            notes=body.notes,
+        )
     except LearningContentNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:

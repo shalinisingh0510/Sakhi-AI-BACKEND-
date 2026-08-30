@@ -199,6 +199,11 @@ class LearningContentUpdate(BaseModel):
         return validate_body_blocks(v)
 
 
+class MedicalReviewRequest(BaseModel):
+    status: str
+    notes: Optional[str] = None
+
+
 class LearningContentResponse(BaseModel):
     id: str
     title: str
@@ -229,6 +234,11 @@ class LearningContentResponse(BaseModel):
     updated_at: datetime
     published_at: Optional[datetime]
 
+    # Phase 8: Medical Trust
+    medical_review_status: str = "NOT_REVIEWED"
+    medical_reviewer_id: Optional[str] = None
+    medical_reviewed_at: Optional[datetime] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -238,6 +248,20 @@ class LearningContentListResponse(BaseModel):
     page: int
     page_size: int
 
+
+# ---------------------------------------------------------------------------
+# Recommendation schemas (Phase 7)
+# ---------------------------------------------------------------------------
+class RecommendationResponse(BaseModel):
+    content: LearningContentResponse
+    reason: str
+    score: float
+
+class RecommendationListResponse(BaseModel):
+    items: List[RecommendationResponse]
+    total: int
+    page: int
+    page_size: int
 
 # ---------------------------------------------------------------------------
 # Progress schemas

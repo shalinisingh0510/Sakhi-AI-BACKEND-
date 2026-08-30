@@ -24,6 +24,7 @@ from app.models.learning import (
     LearningModuleItem,
     Topic,
     Subtopic,
+    ContentReview,
     extract_youtube_id,
     validate_content_combination,
 )
@@ -639,6 +640,25 @@ class LearningService:
     def archive_content(self, content_id: str) -> LearningContent:
         content = self.get_content(content_id, admin=True)
         content.status = "ARCHIVED"
+        self._db.commit()
+        self._db.refresh(content)
+        return content
+
+    def update_medical_review(self, content_id: str, reviewer_id: str, status: str, notes: Optional[str] = None) -> LearningContent:
+        content = self.get_content(content_id, admin=True)
+        content.medical_review_status = status
+        
+        if status == "MEDICALLY_REVIEWED":
+            content.medical_reviewer_id = reviewer_id
+            content.medical_reviewed_at = datetime.utcnow()
+            
+        review = ContentReview(
+            content_id=content_id,
+            reviewer_id=reviewer_id,
+            status=status,
+            notes=notes
+        )
+        self._db.add(review)
         self._db.commit()
         self._db.refresh(content)
         return content
