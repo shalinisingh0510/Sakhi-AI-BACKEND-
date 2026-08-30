@@ -70,8 +70,8 @@ class AIProviderProtocol(Protocol):
         mode: str = "text",
         health_context: dict | None = None,
         retrieved_context: str | None = None,
-    ) -> str:
-        """Return an assistant reply string."""
+    ) -> 'StructuredAIResponse':
+        """Return an assistant reply structure."""
         ...
 
 
@@ -135,7 +135,11 @@ class RuleBasedProvider:
             if preferred_language == _DEFAULT_CONVERSATION_LANGUAGE
             else f" ({preferred_language})"
         )
-        return f"{history_note}{language_hint} {body} This response is educational and not a diagnosis."
+        from app.schemas.ai import StructuredAIResponse
+        return StructuredAIResponse(
+            answer=f"{history_note}{language_hint} {body} This response is educational and not a diagnosis.",
+            citations=[]
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -166,15 +170,18 @@ class OpenAIProvider:
         mode: str = "text",
         health_context: dict | None = None,
         retrieved_context: str | None = None,
-    ) -> str:
+    ) -> 'StructuredAIResponse':
+        from app.schemas.ai import StructuredAIResponse
         if self._client is None:
-            return "[Error: openai package is not installed. Please install it.] " + self._fallback.generate_reply(
+            fallback_response = self._fallback.generate_reply(
                 user_message=user_message,
                 conversation_title=conversation_title,
                 preferred_language=preferred_language,
                 history=history,
                 mode=mode,
             )
+            fallback_response.answer = "[Error: openai package is not installed. Please install it.] " + fallback_response.answer
+            return fallback_response
 
         messages = [{"role": "system", "content": _SYSTEM_PROMPT}]
         if health_context:
@@ -194,37 +201,55 @@ class OpenAIProvider:
         messages.append({"role": "user", "content": user_message})
 
         try:
-            response = self._client.chat.completions.create(
-                model=self._model,
-                messages=messages,  # type: ignore[arg-type]
-                max_tokens=600,
-                temperature=0.4,
-            )
-            reply = response.choices[0].message.content or ""
-            if reply.strip():
-                return reply.strip()
+            # Check if using the beta parse method for Structured Outputs
+            if hasattr(self._client.beta.chat.completions, 'parse'):
+                response = self._client.beta.chat.completions.parse(
+                    model=self._model,
+                    messages=messages,  # type: ignore[arg-type]
+                    max_tokens=600,
+                    temperature=0.4,
+                    response_format=StructuredAIResponse,
+                )
+                return response.choices[0].message.parsed
+            else:
+                # Fallback to function calling or JSON mode if parse isn't available
+                response = self._client.chat.completions.create(
+                    model=self._model,
+                    messages=messages,  # type: ignore[arg-type]
+                    max_tokens=600,
+                    temperature=0.4,
+                    tools=[{
+                        "type": "function",
+                        "function": {
+                            "name": "provide_answer",
+                            "description": "Provide the health educational answer with explicit citations.",
+                            "parameters": StructuredAIResponse.model_json_schema()
+                        }
+                    }],
+                    tool_choice={"type": "function", "function": {"name": "provide_answer"}}
+                )
+                tool_calls = response.choices[0].message.tool_calls
+                if tool_calls:
+                    import json
+                    args = json.loads(tool_calls[0].function.arguments)
+                    return StructuredAIResponse.model_validate(args)
+                else:
+                    return StructuredAIResponse(answer=response.choices[0].message.content or "", citations=[])
         except Exception as exc:
             logger.warning(
                 "OpenAI API call failed (%s: %s). Falling back to rule-based provider.",
                 type(exc).__name__,
                 exc,
             )
-            # Temporarily returning the error for debugging
-            return f"[API Error: {type(exc).__name__} - {exc}] " + self._fallback.generate_reply(
+            fallback_response = self._fallback.generate_reply(
                 user_message=user_message,
                 conversation_title=conversation_title,
                 preferred_language=preferred_language,
                 history=history,
                 mode=mode,
             )
-
-        return self._fallback.generate_reply(
-            user_message=user_message,
-            conversation_title=conversation_title,
-            preferred_language=preferred_language,
-            history=history,
-            mode=mode,
-        )
+            fallback_response.answer = f"[API Error: {type(exc).__name__} - {exc}] " + fallback_response.answer
+            return fallback_response
 
 
 # ---------------------------------------------------------------------------
@@ -248,11 +273,12 @@ class GeminiProvider:
         self.api_key = api_key
         self.model_name = model
         try:
-            import google.generativeai as genai # type: ignore[import]
-            genai.configure(api_key=api_key)
-            self._client = genai.GenerativeModel(model)
+            from google import genai
+            from google.genai import types
+            self._client = genai.Client(api_key=api_key)
+            self._types = types
         except ImportError:
-            logger.warning("google-generativeai package is not installed.")
+            logger.warning("google-genai package is not installed.")
             self._client = None
         self._fallback = RuleBasedProvider()
 
@@ -266,7 +292,8 @@ class GeminiProvider:
         mode: str = "text",
         health_context: dict | None = None,
         retrieved_context: str | None = None,
-    ) -> str:
+    ) -> 'StructuredAIResponse':
+        from app.schemas.ai import StructuredAIResponse
         if self._client is None:
             return self._fallback.generate_reply(
                 user_message=user_message,
@@ -291,32 +318,33 @@ class GeminiProvider:
             system_prompt += f"\n\nPlease respond in {preferred_language}."
 
         try:
-            # We can use system_instruction in GenerativeModel directly.
-            # But the object is already instantiated. To be safe, we just prepend it.
-            # Convert history to Gemini format
             contents = []
-            contents.append({"role": "user", "content": f"System Context: {system_prompt}"})
-            contents.append({"role": "model", "content": "Understood. I will act as Sakhi and follow those instructions."})
             
             for msg in history:
                 role = "user" if msg["role"] == "user" else "model"
-                contents.append({"role": role, "parts": [msg["content"]]})
+                contents.append({"role": role, "parts": [{"text": msg["content"]}]})
             
-            contents.append({"role": "user", "parts": [user_message]})
-            
-            # Note: The above is a simplified conversion. In a real app we'd map properly.
-            # Let's map cleanly to Gemini's format:
-            formatted_contents = []
-            for item in contents:
-                formatted_contents.append({"role": item.get("role", "user"), "parts": item.get("parts", [item.get("content", "")])})
+            contents.append({"role": "user", "parts": [{"text": user_message}]})
 
-            response = self._client.generate_content(
-                formatted_contents,
-                generation_config={"temperature": 0.4, "max_output_tokens": 600}
+            response = self._client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                config=self._types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0.4, 
+                    max_output_tokens=600,
+                    response_mime_type="application/json",
+                    response_schema=StructuredAIResponse,
+                )
             )
             reply = response.text or ""
             if reply.strip():
-                return reply.strip()
+                import json
+                try:
+                    parsed = json.loads(reply.strip())
+                    return StructuredAIResponse.model_validate(parsed)
+                except json.JSONDecodeError:
+                    return StructuredAIResponse(answer=reply.strip(), citations=[])
         except Exception as exc:
             logger.warning(
                 "Gemini API call failed (%s: %s). Falling back to rule-based provider.",

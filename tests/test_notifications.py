@@ -28,13 +28,13 @@ REGISTER_SECOND_USER = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
-def test_user_can_list_notifications_and_mark_as_read(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "notifications.sqlite3")
+def test_user_can_list_notifications_and_mark_as_read(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -97,8 +97,8 @@ def test_user_can_list_notifications_and_mark_as_read(tmp_path: Path) -> None:
     assert unread_count_after_read.json()["unread_count"] == 0
 
 
-def test_admin_can_create_notification_for_all_users(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "broadcast.sqlite3")
+def test_admin_can_create_notification_for_all_users(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -145,8 +145,8 @@ def test_admin_can_create_notification_for_all_users(tmp_path: Path) -> None:
     assert second_user_notifications.json()[0]["title"] == "System Maintenance"
 
 
-def test_notifications_persist_across_app_restart(tmp_path: Path) -> None:
-    database_path = tmp_path / "persistent-notifications.sqlite3"
+def test_notifications_persist_across_app_restart(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
 
     first_client = build_client(database_path)
 
@@ -188,8 +188,8 @@ def test_notifications_persist_across_app_restart(tmp_path: Path) -> None:
     assert persisted_notifications.json()[0]["title"] == "Persistent Notification"
 
 
-def test_user_cannot_access_other_users_notifications(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "isolation.sqlite3")
+def test_user_cannot_access_other_users_notifications(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -235,8 +235,8 @@ def test_user_cannot_access_other_users_notifications(tmp_path: Path) -> None:
     assert mark_read_response.status_code == 404
 
 
-def test_lesson_completion_creates_notification(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "lesson-notification.sqlite3")
+def test_lesson_completion_creates_notification(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -259,8 +259,8 @@ def test_lesson_completion_creates_notification(tmp_path: Path) -> None:
     assert notifications[0]["metadata"]["lesson_slug"] == "understanding-periods"
 
 
-def test_admin_cannot_create_notification_for_nonexistent_user(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "invalid-user.sqlite3")
+def test_admin_cannot_create_notification_for_nonexistent_user(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     admin_response = client.post("/api/v1/auth/register", json=REGISTER_ADMIN)
     assert admin_response.status_code == 201
@@ -280,8 +280,8 @@ def test_admin_cannot_create_notification_for_nonexistent_user(tmp_path: Path) -
     assert create_notification_response.status_code == 404
 
 
-def test_notification_metadata_validation(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "metadata-validation.sqlite3")
+def test_notification_metadata_validation(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -314,8 +314,8 @@ def test_notification_metadata_validation(tmp_path: Path) -> None:
     assert notification["metadata"]["action_url"] == "/lessons/period-basics"
 
 
-def test_unread_only_filtering(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "unread-filter.sqlite3")
+def test_unread_only_filtering(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201

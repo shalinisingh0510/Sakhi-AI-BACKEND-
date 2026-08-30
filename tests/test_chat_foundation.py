@@ -20,13 +20,13 @@ USER_B = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
-def test_1_valid_message_creates_conversation_and_returns_assistant_reply(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "test1.sqlite3")
+def test_1_valid_message_creates_conversation_and_returns_assistant_reply(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     # Register user
     reg = client.post("/api/v1/auth/register", json=USER_A)
@@ -51,8 +51,8 @@ def test_1_valid_message_creates_conversation_and_returns_assistant_reply(tmp_pa
     assert "Sakhi Chat Service Response" in data["message"]["content"]
 
 
-def test_2_empty_message_validation_error(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "test2.sqlite3")
+def test_2_empty_message_validation_error(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     reg = client.post("/api/v1/auth/register", json=USER_A)
     token = reg.json()["access_token"]
 
@@ -64,8 +64,8 @@ def test_2_empty_message_validation_error(tmp_path: Path) -> None:
     assert response.status_code == 422
 
 
-def test_3_whitespace_only_message_validation_error(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "test3.sqlite3")
+def test_3_whitespace_only_message_validation_error(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     reg = client.post("/api/v1/auth/register", json=USER_A)
     token = reg.json()["access_token"]
 
@@ -77,8 +77,8 @@ def test_3_whitespace_only_message_validation_error(tmp_path: Path) -> None:
     assert response.status_code == 422
 
 
-def test_4_excessively_long_message_validation_error(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "test4.sqlite3")
+def test_4_excessively_long_message_validation_error(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     reg = client.post("/api/v1/auth/register", json=USER_A)
     token = reg.json()["access_token"]
 
@@ -91,8 +91,8 @@ def test_4_excessively_long_message_validation_error(tmp_path: Path) -> None:
     assert response.status_code == 422
 
 
-def test_5_unauthorized_request(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "test5.sqlite3")
+def test_5_unauthorized_request(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     # Missing auth
     response = client.post(
@@ -110,8 +110,8 @@ def test_5_unauthorized_request(tmp_path: Path) -> None:
     assert response_invalid.status_code == 401
 
 
-def test_6_invalid_conversation_id(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "test6.sqlite3")
+def test_6_invalid_conversation_id(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     reg = client.post("/api/v1/auth/register", json=USER_A)
     token = reg.json()["access_token"]
 
@@ -126,8 +126,8 @@ def test_6_invalid_conversation_id(tmp_path: Path) -> None:
     assert response.status_code == 404
 
 
-def test_7_conversation_ownership_isolation(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "test7.sqlite3")
+def test_7_conversation_ownership_isolation(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     # User A registers & creates conversation
     reg_a = client.post("/api/v1/auth/register", json=USER_A)
@@ -157,8 +157,8 @@ def test_7_conversation_ownership_isolation(tmp_path: Path) -> None:
     assert resp_b.status_code == 404
 
 
-def test_8_multiple_messages_in_same_conversation(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "test8.sqlite3")
+def test_8_multiple_messages_in_same_conversation(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     reg = client.post("/api/v1/auth/register", json=USER_A)
     token = reg.json()["access_token"]

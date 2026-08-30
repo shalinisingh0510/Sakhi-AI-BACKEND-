@@ -159,8 +159,8 @@ def test_openai_provider_falls_back_when_package_missing(monkeypatch) -> None:
 # Integration: provider wired into AIService via API
 # ---------------------------------------------------------------------------
 
-def test_conversation_uses_rule_based_provider_by_default(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "ai-provider.sqlite3")
+def test_conversation_uses_rule_based_provider_by_default(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     reg = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert reg.status_code == 201
@@ -177,8 +177,8 @@ def test_conversation_uses_rule_based_provider_by_default(tmp_path: Path) -> Non
     assert "diagnosis" in assistant_reply.lower()
 
 
-def test_conversation_history_is_stored_and_accessible(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "ai-history.sqlite3")
+def test_conversation_history_is_stored_and_accessible(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     reg = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert reg.status_code == 201
