@@ -28,6 +28,7 @@ from app.api.v1.endpoints.insights import router as insights_router
 from app.api.v1.endpoints.subscriptions import router as subscriptions_router
 from app.api.v1.endpoints.admin_rag import router as admin_rag_router
 from app.api.v1.endpoints.learning import router as learning_router
+from app.api.v1.endpoints.monetization import router as monetization_router
 
 api_router = APIRouter()
 api_router.include_router(nutrition_router, prefix="/api/v1")
@@ -58,3 +59,4 @@ api_router.include_router(ws_router, prefix="/api/v1")
 api_router.include_router(subscriptions_router, prefix="/api/v1")
 api_router.include_router(admin_rag_router, prefix="/api/v1")
 api_router.include_router(learning_router, prefix="/api/v1")
+api_router.include_router(monetization_router, prefix="/api/v1/monetization")

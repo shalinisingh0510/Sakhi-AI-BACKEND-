@@ -42,7 +42,7 @@ class GamificationService:
         if g.current_streak > g.longest_streak:
             g.longest_streak = g.current_streak
             
-        g.last_checkin_date = datetime.utcnow()
+        g.last_checkin_date = datetime.now(timezone.utc)
         
         # Award XP
         xp_to_add = 10
@@ -73,6 +73,76 @@ class GamificationService:
         if existing:
             return False
             
-        b = UserBadge(user_id=user_id, badge_key=badge_key)
+        b = UserBadge(user_id=user_id, badge_key=badge_key, earned_at=datetime.now(timezone.utc))
         self.db.add(b)
         return True
+
+    def evaluate_learning_badges(self, user_id: str) -> list[str]:
+        """
+        Evaluate and award learning-specific badges.
+        """
+        from app.models.learning import LearningProgress, LearningPath, LearningModule, LearningModuleItem
+        from sqlalchemy import func, and_
+
+        new_badges = []
+        
+        # Check FIRST_LESSON and SCHOLAR_10
+        completed_lessons = self.db.scalar(
+            select(func.count(LearningProgress.content_id)).where(
+                and_(
+                    LearningProgress.user_id == user_id,
+                    LearningProgress.completed.is_(True)
+                )
+            )
+        ) or 0
+        
+        if completed_lessons >= 1:
+            if self._award_badge(user_id, "FIRST_LESSON"):
+                new_badges.append("FIRST_LESSON")
+        if completed_lessons >= 10:
+            if self._award_badge(user_id, "SCHOLAR_10"):
+                new_badges.append("SCHOLAR_10")
+                
+        # Check PATH_COMPLETER
+        total_items_sq = (
+            select(
+                LearningPath.id.label("path_id"),
+                func.count(LearningModuleItem.id).label("total_items")
+            )
+            .join(LearningModule, LearningModule.path_id == LearningPath.id)
+            .join(LearningModuleItem, LearningModuleItem.module_id == LearningModule.id)
+            .group_by(LearningPath.id)
+        ).subquery()
+
+        completed_items_sq = (
+            select(
+                LearningPath.id.label("path_id"),
+                func.count(LearningModuleItem.id).label("completed_items")
+            )
+            .join(LearningModule, LearningModule.path_id == LearningPath.id)
+            .join(LearningModuleItem, LearningModuleItem.module_id == LearningModule.id)
+            .join(LearningProgress, LearningProgress.content_id == LearningModuleItem.content_id)
+            .where(
+                and_(
+                    LearningProgress.user_id == user_id,
+                    LearningProgress.completed.is_(True)
+                )
+            )
+            .group_by(LearningPath.id)
+        ).subquery()
+
+        paths_completed = self.db.scalar(
+            select(func.count(total_items_sq.c.path_id))
+            .join(completed_items_sq, total_items_sq.c.path_id == completed_items_sq.c.path_id)
+            .where(total_items_sq.c.total_items == completed_items_sq.c.completed_items)
+            .where(total_items_sq.c.total_items > 0)
+        ) or 0
+        
+        if paths_completed >= 1:
+            if self._award_badge(user_id, "PATH_COMPLETER"):
+                new_badges.append("PATH_COMPLETER")
+                
+        if new_badges:
+            self.db.commit()
+            
+        return new_badges

@@ -21,6 +21,7 @@ from app.models.wellness_plan import WellnessGoal, WellnessPlan, PlanFrequency, 
 from app.models.integrations import HealthProviderConnection, ExternalSyncLog, ProviderType, ConnectionStatus, SyncStatus
 from app.models.ai_metrics import AIObservabilityLog, AIModelProvider
 from app.models.subscription import SubscriptionPlan, UserSubscription
+from app.models.monetization import AdPlacementConfig, Sponsor, AffiliatePartner, AffiliateProduct
 from app.models.gamification import UserGamification, UserBadge
 from app.models.learning import LearningContent, LearningProgress, LearningBookmark, Topic, Subtopic
 
@@ -29,6 +30,10 @@ __all__ = [
     "ActivityLog",
     "SubscriptionPlan",
     "UserSubscription",
+    "AdPlacementConfig",
+    "Sponsor",
+    "AffiliatePartner",
+    "AffiliateProduct",
     "UserGamification",
     "UserBadge",
     "DocumentChunk",

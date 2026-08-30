@@ -47,12 +47,18 @@ class LearningRecommendationService:
         in_progress_ids = {p.content_id for p in progress_items if not p.completed and p.progress_percent > 0 and p.progress_percent < 100}
 
         # Determine topic interest (using category/topic_id as proxy for topic)
-        # We need to join LearningContent to get category for progress items
-        topic_counts = Counter()
-        for p in progress_items:
-            content = self._db.get(LearningContent, p.content_id)
-            if content and content.topic_id:
-                topic_counts[content.topic_id] += 1
+        topic_counts_db = self._db.execute(
+            select(LearningContent.topic_id, func.count())
+            .join(LearningProgress, LearningProgress.content_id == LearningContent.id)
+            .where(
+                and_(
+                    LearningProgress.user_id == user_id,
+                    LearningContent.topic_id.isnot(None)
+                )
+            )
+            .group_by(LearningContent.topic_id)
+        ).all()
+        topic_counts = Counter({t[0]: t[1] for t in topic_counts_db})
                 
         # Active learning paths: a heuristic is if they have progress on any item in a path
         # For simplicity, we just boost based on topic/category. A true path next item is slightly complex in one pass.
