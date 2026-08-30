@@ -1,4 +1,4 @@
-"""Pydantic schemas for the Learning Content System."""
+"""Pydantic schemas for the Learning Content System — Phase 1+2."""
 
 from __future__ import annotations
 
@@ -9,11 +9,12 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
-# Enums as Literal types (simpler than Python enum for Pydantic v2)
+# Literal types
 # ---------------------------------------------------------------------------
-ContentType = Literal["VIDEO", "ARTICLE", "POST"]
-SourceType = Literal["YOUTUBE", "PRIVATE_VIDEO", "INTERNAL"]
-ContentStatus = Literal["DRAFT", "PUBLISHED", "ARCHIVED", "PENDING_REVIEW", "REJECTED"]
+ContentType = Literal["VIDEO", "ARTICLE", "POST", "TUTORIAL"]
+SourceType = Literal["YOUTUBE", "PRIVATE_VIDEO", "INTERNAL", "INSTAGRAM"]
+ContentStatus = Literal["DRAFT", "PUBLISHED", "ARCHIVED", "PENDING_REVIEW", "REJECTED", "UNDER_REVIEW", "MEDICALLY_REVIEWED", "NEEDS_REVIEW"]
+Audience = Literal["ALL", "TEEN", "ADULT"]
 
 VALID_COMBINATIONS: frozenset[tuple[str, str]] = frozenset(
     [
@@ -21,6 +22,11 @@ VALID_COMBINATIONS: frozenset[tuple[str, str]] = frozenset(
         ("VIDEO", "PRIVATE_VIDEO"),
         ("ARTICLE", "INTERNAL"),
         ("POST", "INTERNAL"),
+        ("TUTORIAL", "INTERNAL"),
+        ("TUTORIAL", "YOUTUBE"),
+        ("TUTORIAL", "PRIVATE_VIDEO"),
+        ("VIDEO", "INSTAGRAM"),
+        ("POST", "INSTAGRAM"),
     ]
 )
 
@@ -29,10 +35,44 @@ YOUTUBE_PATTERN = re.compile(
 )
 
 # ---------------------------------------------------------------------------
-# Content Body Block schemas (for ARTICLE / POST)
+# Topic / Subtopic schemas
+# ---------------------------------------------------------------------------
+
+class SubtopicResponse(BaseModel):
+    id: str
+    topic_id: str
+    name: str
+    slug: str
+    description: Optional[str] = None
+    display_order: int
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TopicResponse(BaseModel):
+    id: str
+    name: str
+    slug: str
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    display_order: int
+    is_active: bool
+    subtopics: List[SubtopicResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TopicsListResponse(BaseModel):
+    items: List[TopicResponse]
+    total: int
+
+
+# ---------------------------------------------------------------------------
+# Content Body Block schemas (for ARTICLE / POST / TUTORIAL)
 # ---------------------------------------------------------------------------
 VALID_BLOCK_TYPES = frozenset(
-    ["heading", "paragraph", "image", "video", "important_box"]
+    ["heading", "paragraph", "image", "video", "important_box", "list", "callout"]
 )
 
 
@@ -68,18 +108,32 @@ class LearningContentBase(BaseModel):
     # Thumbnail: media_files.id
     thumbnail_file_id: Optional[str] = None
 
-    # Article/Post body blocks — list of typed blocks
+    # Article/Post/Tutorial body blocks — list of typed blocks
     body: Optional[List[Dict[str, Any]]] = None
 
     category: str = Field(..., max_length=50)
     tags: List[str] = Field(default_factory=list)
     language: str = Field(default="en", max_length=10)
     is_featured: bool = False
+    is_short_form: bool = False
     status: ContentStatus = "DRAFT"
     duration_minutes: int = Field(default=0, ge=0)
 
+    # Phase 1: Topic taxonomy
+    topic_id: Optional[str] = None
+    subtopic_id: Optional[str] = None
+
+    # Phase 1: Audience targeting
+    audience: Audience = "ALL"
+
+    # Phase 1: Featured ranking (lower = more prominent)
+    featured_rank: Optional[int] = None
+
+    # Phase 1: Translation group for multi-language content
+    translation_group_id: Optional[str] = None
+
     @model_validator(mode="after")
-    def validate_combination(self) -> LearningContentBase:
+    def validate_combination(self) -> "LearningContentBase":
         if (self.content_type, self.source_type) not in VALID_COMBINATIONS:
             raise ValueError(
                 f"content_type='{self.content_type}' is not compatible with "
@@ -89,7 +143,7 @@ class LearningContentBase(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_youtube_url(self) -> LearningContentBase:
+    def validate_youtube_url(self) -> "LearningContentBase":
         if self.source_type == "YOUTUBE":
             if not self.media_url:
                 raise ValueError("media_url is required for YOUTUBE content.")
@@ -101,7 +155,7 @@ class LearningContentBase(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_private_video(self) -> LearningContentBase:
+    def validate_private_video(self) -> "LearningContentBase":
         if self.source_type == "PRIVATE_VIDEO" and not self.media_file_id:
             raise ValueError("media_file_id is required for PRIVATE_VIDEO content.")
         return self
@@ -129,8 +183,15 @@ class LearningContentUpdate(BaseModel):
     tags: Optional[List[str]] = None
     language: Optional[str] = Field(None, max_length=10)
     is_featured: Optional[bool] = None
+    is_short_form: Optional[bool] = None
     status: Optional[ContentStatus] = None
     duration_minutes: Optional[int] = Field(None, ge=0)
+    # Phase 1
+    topic_id: Optional[str] = None
+    subtopic_id: Optional[str] = None
+    audience: Optional[Audience] = None
+    featured_rank: Optional[int] = None
+    translation_group_id: Optional[str] = None
 
     @field_validator("body", mode="before")
     @classmethod
@@ -154,9 +215,16 @@ class LearningContentResponse(BaseModel):
     tags: List[str]
     language: str
     is_featured: bool
+    is_short_form: bool
     status: str
     duration_minutes: int
     author_id: str
+    # Phase 1
+    topic_id: Optional[str] = None
+    subtopic_id: Optional[str] = None
+    audience: str = "ALL"
+    featured_rank: Optional[int] = None
+    translation_group_id: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     published_at: Optional[datetime]
@@ -219,3 +287,62 @@ class LearningHistoryResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: Learning Path & Module Schemas
+# ---------------------------------------------------------------------------
+
+class LearningModuleItemResponse(BaseModel):
+    id: str
+    module_id: str
+    content_id: str
+    display_order: int
+    is_required: bool
+    content: LearningContentResponse
+
+    model_config = ConfigDict(from_attributes=True)
+
+class LearningModuleResponse(BaseModel):
+    id: str
+    path_id: str
+    title: str
+    description: Optional[str]
+    display_order: int
+    items: List[LearningModuleItemResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+class LearningPathResponse(BaseModel):
+    id: str
+    title: str
+    slug: str
+    description: Optional[str]
+    thumbnail_url: Optional[str]
+    topic_id: str
+    language: str
+    audience: str
+    status: str
+    display_order: int
+    is_featured: bool
+    modules: List[LearningModuleResponse] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+    published_at: Optional[datetime]
+
+    model_config = ConfigDict(from_attributes=True)
+
+class LearningPathListResponse(BaseModel):
+    items: List[LearningPathResponse]
+    total: int
+    page: int
+    page_size: int
+
+class LearningPathProgressResponse(BaseModel):
+    path_id: str
+    completed_content: int
+    total_content: int
+    progress_percent: int
+    # Mapping of module_id -> { completed: int, total: int }
+    module_progress: Dict[str, Dict[str, int]]
+
