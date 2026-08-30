@@ -93,6 +93,7 @@ class ChatMessageContent(BaseModel):
     id: str
     role: Literal["assistant", "user"] = "assistant"
     content: str
+    citations: list[dict] | None = None
     created_at: datetime
 
 

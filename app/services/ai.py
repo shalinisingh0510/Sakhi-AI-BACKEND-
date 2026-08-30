@@ -53,6 +53,7 @@ class StoredConversationMessage:
     role: str
     content: str
     created_at: datetime
+    citations: list[dict] | None = None
 
     def to_message(self) -> ConversationMessage:
         return ConversationMessage.model_validate(self)
@@ -77,7 +78,7 @@ class ConversationStoreProtocol(Protocol):
     def get_messages(self, conversation_id: str) -> list[StoredConversationMessage]:
         ...
 
-    def add_message(self, *, conversation_id: str, role: str, content: str) -> StoredConversationMessage:
+    def add_message(self, *, conversation_id: str, role: str, content: str, citations: list[dict] | None = None) -> StoredConversationMessage:
         ...
 
     def update_conversation_timestamp(self, conversation_id: str) -> None:
@@ -103,11 +104,12 @@ class AIService:
         history: list[dict[str, str]],
         mode: str = "text",
         health_context: dict | None = None,
-    ) -> str:
+    ) -> StructuredAIResponse:
         from app.services.ai_orchestration.safety import HealthSafetyRouter, HealthAIResponseGuard, SafetyRiskLevel
         from app.services.rag.retrieval import MedicalKnowledgeService
         from app.services.ai_orchestration.context_builder import ContextBuilder
         from app.db.session import SessionLocal
+        from app.schemas.ai import StructuredAIResponse
 
         router = HealthSafetyRouter()
         
@@ -125,7 +127,7 @@ class AIService:
 
         safety_result = router.validate_pre_generation(user_message, user_age)
         if not safety_result.is_safe:
-            return safety_result.override_message
+            return StructuredAIResponse(answer=safety_result.override_message, citations=[])
 
         # 2. RAG Retrieval
         retrieved_context = None
@@ -147,7 +149,7 @@ class AIService:
             logger.error(f"RAG search failed: {e}")
 
         # 3. LLM Generation
-        reply_text = self._provider.generate_reply(
+        reply_response = self._provider.generate_reply(
             user_message=user_message,
             conversation_title=conversation_title,
             preferred_language=preferred_language,
@@ -159,10 +161,13 @@ class AIService:
 
         # 4. Post-generation validation
         guard = HealthAIResponseGuard()
-        if not guard.validate_post_generation(reply_text):
-            return "I apologize, but I am unable to provide a safe response to that question. Please consult a healthcare professional for medical advice."
+        if not guard.validate_post_generation(reply_response.answer):
+            return StructuredAIResponse(
+                answer="I apologize, but I am unable to provide a safe response to that question. Please consult a healthcare professional for medical advice.",
+                citations=[]
+            )
 
-        return reply_text
+        return reply_response
 
     def create_conversation(
         self,
@@ -183,7 +188,7 @@ class AIService:
         )
         self._store.add_message(conversation_id=conversation.id, role="user", content=initial_message)
         
-        reply_text = self._generate_orchestrated_reply(
+        reply_response = self._generate_orchestrated_reply(
             user_message=initial_message,
             conversation_title=conversation.title,
             preferred_language=conversation.preferred_language,
@@ -195,7 +200,8 @@ class AIService:
         self._store.add_message(
             conversation_id=conversation.id,
             role="assistant",
-            content=reply_text,
+            content=reply_response.answer,
+            citations=[c.model_dump(exclude_none=True) for c in reply_response.citations],
         )
         return self.get_conversation(user_id=user_id, conversation_id=conversation.id)
 
@@ -221,7 +227,7 @@ class AIService:
         # Build recent history for context-aware replies (respects history limit)
         history = self._build_history(conversation_id=conversation.id, exclude_last_n=1)
         
-        reply_text = self._generate_orchestrated_reply(
+        reply_response = self._generate_orchestrated_reply(
             user_message=message,
             conversation_title=conversation.title,
             preferred_language=conversation.preferred_language,
@@ -230,7 +236,12 @@ class AIService:
             health_context=health_context
         )
         
-        self._store.add_message(conversation_id=conversation.id, role="assistant", content=reply_text)
+        self._store.add_message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=reply_response.answer,
+            citations=[c.model_dump(exclude_none=True) for c in reply_response.citations],
+        )
         return self.get_conversation(user_id=user_id, conversation_id=conversation.id)
 
     def _require_owned_conversation(self, *, user_id: str, conversation_id: str) -> StoredConversation:
