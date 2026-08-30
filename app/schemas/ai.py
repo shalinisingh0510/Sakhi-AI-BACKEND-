@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.auth import SUPPORTED_LANGUAGES
+
+
+class Citation(BaseModel):
+    id: str | None = None
+    source: str
+    text: str | None = None
+    url: str | None = None
+
+
+class StructuredAIResponse(BaseModel):
+    answer: str
+    citations: list[Citation] = Field(default_factory=list)
 
 
 class ConversationSummary(BaseModel):
@@ -27,6 +39,7 @@ class ConversationMessage(BaseModel):
     conversation_id: str
     role: Literal["user", "assistant"]
     content: str
+    citations: list[dict[str, Any]] | None = None
     created_at: datetime
 
 

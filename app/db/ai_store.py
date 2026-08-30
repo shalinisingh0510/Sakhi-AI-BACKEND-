@@ -36,11 +36,17 @@ class PostgresConversationStore:
                     conversation_id TEXT NOT NULL,
                     role TEXT NOT NULL,
                     content TEXT NOT NULL,
+                    citations JSONB,
                     created_at TEXT NOT NULL,
                     FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
                 )
                 """
             )
+            # Migration for existing databases
+            try:
+                conn.execute("ALTER TABLE conversation_messages ADD COLUMN citations JSONB")
+            except Exception:
+                pass
             conn.execute("CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON conversation_messages(conversation_id)")
 
@@ -66,11 +72,21 @@ class PostgresConversationStore:
         created_at = datetime.fromisoformat(row["created_at"])
         if created_at.tzinfo is None:
             created_at = created_at.replace(tzinfo=timezone.utc)
+        
+        citations = row.get("citations")
+        if isinstance(citations, str):
+            import json
+            try:
+                citations = json.loads(citations)
+            except json.JSONDecodeError:
+                citations = None
+
         return StoredConversationMessage(
             id=row["id"],
             conversation_id=row["conversation_id"],
             role=row["role"],
             content=row["content"],
+            citations=citations,
             created_at=created_at,
         )
 
@@ -133,7 +149,7 @@ class PostgresConversationStore:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(
                     """
-                    SELECT id, conversation_id, role, content, created_at
+                    SELECT id, conversation_id, role, content, citations, created_at
                     FROM conversation_messages
                     WHERE conversation_id = %s
                     ORDER BY created_at ASC
@@ -142,16 +158,20 @@ class PostgresConversationStore:
                 ).fetchall()
         return [self._row_to_message(row) for row in rows]
 
-    def add_message(self, *, conversation_id: str, role: str, content: str) -> StoredConversationMessage:
+    def add_message(self, *, conversation_id: str, role: str, content: str, citations: list[dict] | None = None) -> StoredConversationMessage:
         message_id = uuid4().hex
         timestamp = datetime.now(timezone.utc).isoformat()
+        
+        import json
+        citations_json = json.dumps(citations) if citations is not None else None
+
         with self._pool.connection() as conn:
             conn.execute(
                 """
-                INSERT INTO conversation_messages (id, conversation_id, role, content, created_at)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO conversation_messages (id, conversation_id, role, content, citations, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 """,
-                (message_id, conversation_id, role, content, timestamp),
+                (message_id, conversation_id, role, content, citations_json, timestamp),
             )
             conn.execute(
                 "UPDATE conversations SET updated_at = %s WHERE id = %s",
