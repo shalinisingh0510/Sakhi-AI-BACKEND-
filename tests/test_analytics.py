@@ -22,13 +22,13 @@ REGISTER_ADMIN = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
-def test_user_can_track_analytics_events(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "analytics.sqlite3")
+def test_user_can_track_analytics_events(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -57,8 +57,8 @@ def test_user_can_track_analytics_events(tmp_path: Path) -> None:
     assert events[0]["event_type"] == "lesson_view"
 
 
-def test_user_can_get_engagement_metrics(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "engagement.sqlite3")
+def test_user_can_get_engagement_metrics(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -90,8 +90,8 @@ def test_user_can_get_engagement_metrics(tmp_path: Path) -> None:
     assert metrics["last_activity"] is not None
 
 
-def test_admin_can_get_platform_overview(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "overview.sqlite3")
+def test_admin_can_get_platform_overview(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -118,8 +118,8 @@ def test_admin_can_get_platform_overview(tmp_path: Path) -> None:
     assert overview["total_lesson_views"] == 1
 
 
-def test_user_cannot_access_platform_analytics(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "access-control.sqlite3")
+def test_user_cannot_access_platform_analytics(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -130,8 +130,8 @@ def test_user_cannot_access_platform_analytics(tmp_path: Path) -> None:
     assert overview_response.status_code == 403
 
 
-def test_analytics_events_persist_across_restart(tmp_path: Path) -> None:
-    database_path = tmp_path / "persistent-analytics.sqlite3"
+def test_analytics_events_persist_across_restart(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
 
     first_client = build_client(database_path)
 
@@ -161,8 +161,8 @@ def test_analytics_events_persist_across_restart(tmp_path: Path) -> None:
     assert events[0]["event_type"] == "login"
 
 
-def test_event_type_filtering(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "filtering.sqlite3")
+def test_event_type_filtering(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -194,8 +194,8 @@ def test_event_type_filtering(tmp_path: Path) -> None:
     assert len(filtered_events.json()) == 2
 
 
-def test_admin_can_get_event_breakdown(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "breakdown.sqlite3")
+def test_admin_can_get_event_breakdown(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -233,8 +233,8 @@ def test_admin_can_get_event_breakdown(tmp_path: Path) -> None:
     assert "conversation_start" in event_types
 
 
-def test_admin_can_get_daily_activity(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "daily.sqlite3")
+def test_admin_can_get_daily_activity(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -260,8 +260,8 @@ def test_admin_can_get_daily_activity(tmp_path: Path) -> None:
     assert activity[0]["event_count"] >= 5
 
 
-def test_admin_can_get_top_users(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "top-users.sqlite3")
+def test_admin_can_get_top_users(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     first_user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert first_user_response.status_code == 201
@@ -306,8 +306,8 @@ def test_admin_can_get_top_users(tmp_path: Path) -> None:
     assert top_users[0]["total_events"] >= 10
 
 
-def test_admin_can_get_full_analytics_report(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "report.sqlite3")
+def test_admin_can_get_full_analytics_report(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -341,8 +341,8 @@ def test_admin_can_get_full_analytics_report(tmp_path: Path) -> None:
     assert report["overview"]["total_events"] == 2
 
 
-def test_event_metadata_validation(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "metadata.sqlite3")
+def test_event_metadata_validation(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -368,8 +368,8 @@ def test_event_metadata_validation(tmp_path: Path) -> None:
     assert event["metadata"]["duration_seconds"] == "120"
 
 
-def test_invalid_event_type_rejected(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "validation.sqlite3")
+def test_invalid_event_type_rejected(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201

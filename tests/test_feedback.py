@@ -28,13 +28,13 @@ REGISTER_ADMIN = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
-def test_user_can_submit_and_list_feedback_and_persist(tmp_path: Path) -> None:
-    database_path = tmp_path / "feedback.sqlite3"
+def test_user_can_submit_and_list_feedback_and_persist(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
     client = build_client(database_path)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
@@ -79,8 +79,8 @@ def test_user_can_submit_and_list_feedback_and_persist(tmp_path: Path) -> None:
     assert len(persisted_response.json()) == 1
 
 
-def test_feedback_is_scoped_to_owner(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "feedback-scope.sqlite3")
+def test_feedback_is_scoped_to_owner(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_one = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_one.status_code == 201
@@ -109,8 +109,8 @@ def test_feedback_is_scoped_to_owner(tmp_path: Path) -> None:
     assert user_two_items.json() == []
 
 
-def test_admin_can_list_and_update_feedback_status(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "feedback-admin.sqlite3")
+def test_admin_can_list_and_update_feedback_status(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_response.status_code == 201
@@ -148,8 +148,8 @@ def test_admin_can_list_and_update_feedback_status(tmp_path: Path) -> None:
     assert updated["resolved_at"] is not None
 
 
-def test_admin_stats_include_feedback_overview(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "feedback-stats.sqlite3")
+def test_admin_stats_include_feedback_overview(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     user_one = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert user_one.status_code == 201
@@ -203,8 +203,8 @@ def test_admin_stats_include_feedback_overview(tmp_path: Path) -> None:
     assert feedback["average_rating"] == 3.0
 
 
-def test_feedback_validation_rejects_invalid_category(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "feedback-validation.sqlite3")
+def test_feedback_validation_rejects_invalid_category(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     register_response = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert register_response.status_code == 201

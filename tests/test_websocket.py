@@ -16,8 +16,8 @@ REGISTER_USER = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
@@ -27,11 +27,11 @@ def _register_and_token(client: TestClient, user: dict) -> str:
     return resp.json()["access_token"]
 
 
-def test_websocket_rejects_missing_token(tmp_path: Path) -> None:
+def test_websocket_rejects_missing_token(tmp_path: Path, test_db_url: str) -> None:
     """Connection without a valid token must be rejected (close code 4001)."""
     from starlette.websockets import WebSocketDisconnect
 
-    client = build_client(tmp_path / "ws-no-token.sqlite3")
+    client = build_client(test_db_url)
 
     # Empty token — server closes immediately with 4001
     try:
@@ -43,9 +43,9 @@ def test_websocket_rejects_missing_token(tmp_path: Path) -> None:
         pass  # Any failure to connect is acceptable
 
 
-def test_websocket_rejects_invalid_token(tmp_path: Path) -> None:
+def test_websocket_rejects_invalid_token(tmp_path: Path, test_db_url: str) -> None:
     """A garbage token must be rejected (close code 4001)."""
-    client = build_client(tmp_path / "ws-bad-token.sqlite3")
+    client = build_client(test_db_url)
     # WebSocket with invalid token — server closes the socket
     try:
         with client.websocket_connect("/api/v1/ws/notifications?token=not-a-real-token") as ws:
@@ -55,11 +55,11 @@ def test_websocket_rejects_invalid_token(tmp_path: Path) -> None:
         pass  # Expected — connection was rejected
 
 
-def test_websocket_accepts_valid_token_and_sends_welcome(tmp_path: Path) -> None:
+def test_websocket_accepts_valid_token_and_sends_welcome(tmp_path: Path, test_db_url: str) -> None:
     """Authenticated WebSocket should receive a 'connected' welcome message."""
     import json
 
-    client = build_client(tmp_path / "ws-valid.sqlite3")
+    client = build_client(test_db_url)
     token = _register_and_token(client, REGISTER_USER)
 
     with client.websocket_connect(f"/api/v1/ws/notifications?token={token}") as ws:
@@ -68,11 +68,11 @@ def test_websocket_accepts_valid_token_and_sends_welcome(tmp_path: Path) -> None
         assert "user_id" in data
 
 
-def test_websocket_echoes_pong_on_client_message(tmp_path: Path) -> None:
+def test_websocket_echoes_pong_on_client_message(tmp_path: Path, test_db_url: str) -> None:
     """Sending any message to the server should trigger a pong response."""
     import json
 
-    client = build_client(tmp_path / "ws-pong.sqlite3")
+    client = build_client(test_db_url)
     token = _register_and_token(client, REGISTER_USER)
 
     with client.websocket_connect(f"/api/v1/ws/notifications?token={token}") as ws:

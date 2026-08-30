@@ -22,8 +22,8 @@ REGISTER_USER_2 = {
 }
 
 
-def build_client(database_path: Path) -> TestClient:
-    settings = Settings(database_path=database_path)
+def build_client(database_url: str) -> TestClient:
+    settings = Settings(database_url=database_url)
     return TestClient(create_app(settings=settings))
 
 
@@ -31,8 +31,8 @@ def build_client(database_path: Path) -> TestClient:
 # Logout / token revocation
 # ---------------------------------------------------------------------------
 
-def test_logout_revokes_token(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "logout.sqlite3")
+def test_logout_revokes_token(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     reg = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert reg.status_code == 201
@@ -50,15 +50,15 @@ def test_logout_revokes_token(tmp_path: Path) -> None:
     assert client.get("/api/v1/auth/me", headers=headers).status_code == 401
 
 
-def test_logout_requires_authentication(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "logout-unauth.sqlite3")
+def test_logout_requires_authentication(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     resp = client.post("/api/v1/auth/logout")
     assert resp.status_code == 401
 
 
-def test_logout_does_not_affect_other_tokens(tmp_path: Path) -> None:
+def test_logout_does_not_affect_other_tokens(tmp_path: Path, test_db_url: str) -> None:
     """Logging out one token must not invalidate other sessions."""
-    client = build_client(tmp_path / "logout-multi.sqlite3")
+    client = build_client(test_db_url)
 
     reg = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert reg.status_code == 201
@@ -114,8 +114,8 @@ def test_token_blacklist_size_property() -> None:
 # Account deletion
 # ---------------------------------------------------------------------------
 
-def test_user_can_delete_own_account(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "delete-account.sqlite3")
+def test_user_can_delete_own_account(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     reg = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert reg.status_code == 201
@@ -139,8 +139,8 @@ def test_user_can_delete_own_account(tmp_path: Path) -> None:
     ).status_code == 401
 
 
-def test_account_deletion_requires_authentication(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "delete-unauth.sqlite3")
+def test_account_deletion_requires_authentication(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
     resp = client.delete("/api/v1/auth/me")
     assert resp.status_code == 401
 
@@ -164,8 +164,8 @@ def test_account_deletion_persists_across_restart(tmp_path: Path) -> None:
     ).status_code == 401
 
 
-def test_deleted_account_email_can_be_reused(tmp_path: Path) -> None:
-    client = build_client(tmp_path / "delete-reuse.sqlite3")
+def test_deleted_account_email_can_be_reused(tmp_path: Path, test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     reg = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert reg.status_code == 201
@@ -179,9 +179,9 @@ def test_deleted_account_email_can_be_reused(tmp_path: Path) -> None:
     assert rerun.json()["user"]["email"] == REGISTER_USER["email"]
 
 
-def test_admin_delete_does_not_affect_other_users(tmp_path: Path) -> None:
+def test_admin_delete_does_not_affect_other_users(tmp_path: Path, test_db_url: str) -> None:
     """Deleting one user account must not remove other accounts."""
-    client = build_client(tmp_path / "delete-isolation.sqlite3")
+    client = build_client(test_db_url)
 
     reg1 = client.post("/api/v1/auth/register", json=REGISTER_USER)
     assert reg1.status_code == 201

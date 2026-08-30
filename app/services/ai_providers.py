@@ -248,11 +248,12 @@ class GeminiProvider:
         self.api_key = api_key
         self.model_name = model
         try:
-            import google.generativeai as genai # type: ignore[import]
-            genai.configure(api_key=api_key)
-            self._client = genai.GenerativeModel(model)
+            from google import genai
+            from google.genai import types
+            self._client = genai.Client(api_key=api_key)
+            self._types = types
         except ImportError:
-            logger.warning("google-generativeai package is not installed.")
+            logger.warning("google-genai package is not installed.")
             self._client = None
         self._fallback = RuleBasedProvider()
 
@@ -291,28 +292,22 @@ class GeminiProvider:
             system_prompt += f"\n\nPlease respond in {preferred_language}."
 
         try:
-            # We can use system_instruction in GenerativeModel directly.
-            # But the object is already instantiated. To be safe, we just prepend it.
-            # Convert history to Gemini format
             contents = []
-            contents.append({"role": "user", "content": f"System Context: {system_prompt}"})
-            contents.append({"role": "model", "content": "Understood. I will act as Sakhi and follow those instructions."})
             
             for msg in history:
                 role = "user" if msg["role"] == "user" else "model"
-                contents.append({"role": role, "parts": [msg["content"]]})
+                contents.append({"role": role, "parts": [{"text": msg["content"]}]})
             
-            contents.append({"role": "user", "parts": [user_message]})
-            
-            # Note: The above is a simplified conversion. In a real app we'd map properly.
-            # Let's map cleanly to Gemini's format:
-            formatted_contents = []
-            for item in contents:
-                formatted_contents.append({"role": item.get("role", "user"), "parts": item.get("parts", [item.get("content", "")])})
+            contents.append({"role": "user", "parts": [{"text": user_message}]})
 
-            response = self._client.generate_content(
-                formatted_contents,
-                generation_config={"temperature": 0.4, "max_output_tokens": 600}
+            response = self._client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                config=self._types.GenerateContentConfig(
+                    system_instruction=system_prompt,
+                    temperature=0.4, 
+                    max_output_tokens=600
+                )
             )
             reply = response.text or ""
             if reply.strip():

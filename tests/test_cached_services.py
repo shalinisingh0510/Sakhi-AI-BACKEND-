@@ -1,21 +1,23 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 
 from app.core.cache import InMemoryCacheBackend
 from app.core.config import Settings
-from app.db import SQLiteAnalyticsStore, SQLiteAuthStore, SQLiteLessonStore
+from app.db import PostgresAnalyticsStore, PostgresAuthStore, PostgresLessonStore
 from app.schemas.auth import SUPPORTED_LANGUAGES
 from app.schemas.lesson import LessonSection
 from app.services.analytics import AnalyticsService
 from app.services.lessons import LessonService
 
 
-class CountingLessonStore(SQLiteLessonStore):
-    def __init__(self, database_path: str | Path) -> None:
-        super().__init__(database_path)
+class CountingLessonStore(PostgresLessonStore):
+    def __init__(self, session_factory) -> None:
+        super().__init__(session_factory)
         self.list_lessons_calls = 0
         self.search_lessons_calls = 0
+        self.get_categories_calls = 0
+        self.get_lesson_calls = 0
 
     def list_lessons(self, *, published_only: bool | None = None):
         self.list_lessons_calls += 1
@@ -26,10 +28,12 @@ class CountingLessonStore(SQLiteLessonStore):
         return super().search_lessons(query, published_only=published_only)
 
 
-class CountingAnalyticsStore(SQLiteAnalyticsStore):
-    def __init__(self, database_path: str | Path) -> None:
-        super().__init__(database_path)
+class CountingAnalyticsStore(PostgresAnalyticsStore):
+    def __init__(self, pool) -> None:
+        super().__init__(pool)
         self.platform_overview_calls = 0
+        self.user_engagement_calls = 0
+        self.active_users_calls = 0
 
     def get_platform_overview(self) -> dict[str, int]:
         self.platform_overview_calls += 1
@@ -43,8 +47,8 @@ REGISTER_USER = {
 }
 
 
-def test_lesson_catalog_cache_reuses_reads_until_mutation(tmp_path: Path) -> None:
-    database_path = tmp_path / "lesson-cache.sqlite3"
+def test_lesson_catalog_cache_reuses_reads_until_mutation(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
     settings = Settings(database_path=database_path, cache_ttl_seconds=300)
     store = CountingLessonStore(database_path)
     service = LessonService(settings, store=store, cache=InMemoryCacheBackend())
@@ -75,8 +79,8 @@ def test_lesson_catalog_cache_reuses_reads_until_mutation(tmp_path: Path) -> Non
 
 
 
-def test_lesson_search_uses_store_search_path_and_cache(tmp_path: Path) -> None:
-    database_path = tmp_path / "lesson-search-cache.sqlite3"
+def test_lesson_search_uses_store_search_path_and_cache(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
     settings = Settings(database_path=database_path, cache_ttl_seconds=300)
     store = CountingLessonStore(database_path)
     service = LessonService(settings, store=store, cache=InMemoryCacheBackend())
@@ -103,8 +107,8 @@ def test_lesson_search_uses_store_search_path_and_cache(tmp_path: Path) -> None:
     assert any(lesson.slug == "night-rest-ritual" for lesson in first)
 
 
-def test_analytics_overview_cache_reuses_reads_until_new_event(tmp_path: Path) -> None:
-    database_path = tmp_path / "analytics-cache.sqlite3"
+def test_analytics_overview_cache_reuses_reads_until_new_event(tmp_path: Path, test_db_url: str) -> None:
+    database_path = test_db_url
     settings = Settings(database_path=database_path, cache_ttl_seconds=300)
     auth_store = SQLiteAuthStore(database_path)
     user = auth_store.create_user(
