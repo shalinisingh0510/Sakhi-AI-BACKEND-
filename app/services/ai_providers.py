@@ -259,7 +259,7 @@ class OpenAIProvider:
 
 class GroqProvider(OpenAIProvider):
     """Calls the Groq API using the OpenAI SDK."""
-    def __init__(self, api_key: str, model: str = "mixtral-8x7b-32768") -> None:
+    def __init__(self, api_key: str, model: str = "gemma2-9b-it") -> None:
         super().__init__(api_key=api_key, model=model, base_url="https://api.groq.com/openai/v1")
         self._supports_structured_outputs = False
 
@@ -275,12 +275,12 @@ class GeminiProvider:
         self.api_key = api_key
         self.model_name = model
         try:
-            from google import genai
-            from google.genai import types
-            self._client = genai.Client(api_key=api_key)
-            self._types = types
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            self._client = genai.GenerativeModel(model)
+            self._genai_types = genai.types
         except ImportError:
-            logger.warning("google-genai package is not installed.")
+            logger.warning("google.generativeai package is not installed.")
             self._client = None
         self._fallback = RuleBasedProvider()
 
@@ -320,7 +320,10 @@ class GeminiProvider:
             system_prompt += f"\n\nPlease respond in {preferred_language}."
 
         try:
-            contents = []
+            contents = [
+                {"role": "user", "parts": [{"text": "SYSTEM INSTRUCTION:\n" + system_prompt}]},
+                {"role": "model", "parts": [{"text": "Understood. I will strictly follow these instructions."}]}
+            ]
             
             for msg in history:
                 role = "user" if msg["role"] == "user" else "model"
@@ -328,15 +331,12 @@ class GeminiProvider:
             
             contents.append({"role": "user", "parts": [{"text": user_message}]})
 
-            response = self._client.models.generate_content(
-                model=self.model_name,
-                contents=contents,
-                config=self._types.GenerateContentConfig(
-                    system_instruction=system_prompt,
+            response = self._client.generate_content(
+                contents,
+                generation_config=self._genai_types.GenerationConfig(
                     temperature=0.4, 
                     max_output_tokens=600,
                     response_mime_type="application/json",
-                    response_schema=StructuredAIResponse,
                 )
             )
             reply = response.text or ""
