@@ -222,6 +222,9 @@ class AnalyticsService:
         self._cache_set(cache_key, [item.model_dump(mode="json") for item in metrics_list])
         return metrics_list
 
+    def get_rag_metrics(self) -> dict[str, float]:
+        """Get RAG query metrics from the store."""
+        return self._store.get_rag_metrics()
 
     def _cache_version(self) -> int:
         if self._cache is None:

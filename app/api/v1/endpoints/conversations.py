@@ -37,10 +37,19 @@ def create_conversation(
     db: Session = Depends(get_db),
 ) -> ConversationDetail:
     intent_result = IntentRouter().route(payload.initial_message)
-    scopes = intent_result.required_scopes
+    scopes = set(intent_result.required_scopes)
+    scopes.add("PROFILE")
     
-    context_obj = HealthContextBuilder(db, current_user.id).build_context(scopes)
+    context_obj = HealthContextBuilder(db, current_user.id).build_context(list(scopes))
     health_context_dict = context_obj.model_dump() if context_obj else None
+
+    if not health_context_dict:
+        profile = db.query(HealthProfile).filter(HealthProfile.user_id == current_user.id).first()
+        if profile and profile.date_of_birth:
+            import datetime
+            today = datetime.date.today()
+            age = today.year - profile.date_of_birth.year - ((today.month, today.day) < (profile.date_of_birth.month, profile.date_of_birth.day))
+            health_context_dict = {"age": age}
 
     return ai_service.create_conversation(
         user_id=current_user.id,
@@ -78,19 +87,20 @@ def send_message(
     # 2. Gather Personal Health Context
     health_context_dict = None
     if intent_result.category in (IntentCategory.PERSONAL_HEALTH, IntentCategory.COMBINED):
-        context_obj = HealthContextBuilder(db, current_user.id).build_context(intent_result.required_scopes)
+        # We always add "PROFILE" scope to ensure 'age' is calculated for safety routing
+        scopes = set(intent_result.required_scopes)
+        scopes.add("PROFILE")
+        context_obj = HealthContextBuilder(db, current_user.id).build_context(list(scopes))
         if context_obj:
             health_context_dict = context_obj.model_dump()
             
-    # Include age directly in health context for safety checks
-    profile = db.query(HealthProfile).filter(HealthProfile.user_id == current_user.id).first()
-    if profile and profile.date_of_birth:
-        import datetime
-        today = datetime.date.today()
-        age = today.year - profile.date_of_birth.year - ((today.month, today.day) < (profile.date_of_birth.month, profile.date_of_birth.day))
-        if health_context_dict:
-            health_context_dict["age"] = age
-        else:
+    # If personalization is disabled, context_obj is None. We still need age for safety!
+    if not health_context_dict:
+        profile = db.query(HealthProfile).filter(HealthProfile.user_id == current_user.id).first()
+        if profile and profile.date_of_birth:
+            import datetime
+            today = datetime.date.today()
+            age = today.year - profile.date_of_birth.year - ((today.month, today.day) < (profile.date_of_birth.month, profile.date_of_birth.day))
             health_context_dict = {"age": age}
 
     # 3. Generate Response via AIService (handles Safety, RAG, and LLM)

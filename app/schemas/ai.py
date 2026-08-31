@@ -49,6 +49,8 @@ class ConversationDetail(BaseModel):
 
 
 class CreateConversationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    
     title: str | None = Field(default=None, max_length=120)
     initial_message: str = Field(min_length=1, max_length=4000)
     preferred_language: str | None = Field(default=None, max_length=32)
@@ -86,6 +88,8 @@ class CreateConversationRequest(BaseModel):
 
 
 class SendMessageRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    
     message: str = Field(min_length=1, max_length=4000)
     mode: Literal["text", "voice"] = "text"
 
