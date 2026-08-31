@@ -44,6 +44,7 @@ api_router.include_router(insights_router, prefix="/api/v1")
 api_router.include_router(health_router, prefix="/api/v1")
 api_router.include_router(health_profile_router, prefix="/api/v1")
 api_router.include_router(auth_router, prefix="/api/v1")
+api_router.include_router(auth_router)  # Expose without /api/v1 for frontend compatibility
 api_router.include_router(chat_router, prefix="/api/v1/chat")
 api_router.include_router(conversations_router, prefix="/api/v1")
 api_router.include_router(lessons_router, prefix="/api/v1")
