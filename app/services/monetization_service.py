@@ -4,8 +4,10 @@ from typing import Sequence
 import json
 
 from app.models.monetization import AdPlacementConfig, Sponsor, AffiliatePartner, AffiliateProduct
-from app.core.config import settings
+from app.core.config import get_settings
 from app.schemas.monetization import AdConfigPublicResponse, AdPlacementConfigResponse
+
+settings = get_settings()
 
 class MonetizationService:
     def __init__(self, db: AsyncSession):
