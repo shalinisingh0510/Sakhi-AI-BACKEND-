@@ -279,7 +279,7 @@ class LearningService:
 
         # Paths Started
         paths_started = self._db.scalar(
-            select(func.count(func.distinct(LearningPath.id)))
+            select(func.count(LearningPath.id.distinct()))
             .join(LearningModule, LearningModule.path_id == LearningPath.id)
             .join(LearningModuleItem, LearningModuleItem.module_id == LearningModule.id)
             .join(LearningProgress, LearningProgress.content_id == LearningModuleItem.content_id)

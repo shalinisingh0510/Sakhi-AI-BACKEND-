@@ -1,8 +1,7 @@
 import os
 from typing import Protocol, List
 from pydantic import BaseModel
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 from PIL import Image
 import io
 
@@ -27,8 +26,8 @@ class GeminiVisionProvider:
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not set.")
             
-        self.client = genai.Client(api_key=self.api_key)
-        self.model_name = model_name
+        genai.configure(api_key=self.api_key)
+        self.model = genai.GenerativeModel(model_name)
 
     def identify_food(self, image_bytes: bytes) -> List[FoodCandidate]:
         image = Image.open(io.BytesIO(image_bytes))
@@ -48,10 +47,9 @@ class GeminiVisionProvider:
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=[prompt, image],
-                config=types.GenerateContentConfig(response_mime_type="application/json")
+            response = self.model.generate_content(
+                [prompt, image],
+                generation_config=genai.types.GenerationConfig(response_mime_type="application/json")
             )
             import json
             data = json.loads(response.text)
