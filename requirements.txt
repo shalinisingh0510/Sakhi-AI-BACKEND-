@@ -1,4 +1,4 @@
-﻿# Core runtime dependencies
+# Core runtime dependencies
 
 fastapi>=0.115,<1.0
 
@@ -21,8 +21,7 @@ gunicorn>=21.0,<23.0
 # Uncomment the line below or install with: pip install "sakhi-ai-backend[ai]"
 
 openai>=1.30,<2.0
-
-google-genai>=0.2.0
+google-generativeai>=0.8.0
 
 # Database ORM and migrations (Phase 0)
 
