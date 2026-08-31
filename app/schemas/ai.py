@@ -82,6 +82,11 @@ class CreateConversationRequest(BaseModel):
         normalized = value.strip().lower()
         if not normalized:
             return None
+            
+        locale_map = {"en": "english", "hi": "hindi", "mr": "marathi"}
+        if normalized in locale_map:
+            normalized = locale_map[normalized]
+            
         if normalized not in SUPPORTED_LANGUAGES:
             raise ValueError("Unsupported preferred language.")
         return normalized
