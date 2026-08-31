@@ -108,7 +108,7 @@ class AIService:
         from app.services.ai_orchestration.safety import HealthSafetyRouter, HealthAIResponseGuard, SafetyRiskLevel
         from app.services.rag.retrieval import MedicalKnowledgeService
         from app.services.ai_orchestration.context_builder import ContextBuilder
-        from app.db.session import SessionLocal
+        from app.db.session import get_session_factory
         from app.schemas.ai import StructuredAIResponse
 
         router = HealthSafetyRouter()
@@ -134,7 +134,7 @@ class AIService:
         start_time = __import__("time").time()
         retrieval_result = None
         try:
-            db = SessionLocal()
+            db = get_session_factory()()
             try:
                 rag_service = MedicalKnowledgeService(db=db)
                 retrieval_result = rag_service.search(query=user_message, history=[])

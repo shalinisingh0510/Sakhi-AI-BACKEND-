@@ -82,6 +82,11 @@ class ChatMessageRequest(BaseModel):
         normalized = value.strip().lower()
         if not normalized:
             raise ValueError("Preferred language cannot be empty.")
+            
+        locale_map = {"en": "english", "hi": "hindi", "mr": "marathi"}
+        if normalized in locale_map:
+            normalized = locale_map[normalized]
+            
         if normalized not in SUPPORTED_LANGUAGES:
             raise ValueError("Unsupported preferred language.")
         return normalized

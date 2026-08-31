@@ -29,6 +29,7 @@ from app.api.v1.endpoints.subscriptions import router as subscriptions_router
 from app.api.v1.endpoints.admin_rag import router as admin_rag_router
 from app.api.v1.endpoints.learning import router as learning_router
 from app.api.v1.endpoints.monetization import router as monetization_router
+from app.api.v1.endpoints.voice import router as voice_router
 
 api_router = APIRouter()
 api_router.include_router(nutrition_router, prefix="/api/v1")
@@ -46,6 +47,7 @@ api_router.include_router(health_profile_router, prefix="/api/v1")
 api_router.include_router(auth_router, prefix="/api/v1")
 api_router.include_router(auth_router)  # Expose without /api/v1 for frontend compatibility
 api_router.include_router(chat_router, prefix="/api/v1/chat")
+api_router.include_router(voice_router, prefix="/api/v1/chat/voice")
 api_router.include_router(conversations_router, prefix="/api/v1")
 api_router.include_router(lessons_router, prefix="/api/v1")
 api_router.include_router(feedback_router, prefix="/api/v1")

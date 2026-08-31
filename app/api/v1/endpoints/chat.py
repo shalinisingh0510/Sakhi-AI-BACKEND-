@@ -36,10 +36,9 @@ def send_chat_message(
         
         # 2. Gather Personal Health Context
         health_context_dict = None
-        from app.db.session import SessionLocal
-        db = SessionLocal()
+        from app.db.session import get_session_factory
+        db = get_session_factory()()
         try:
-            # We always add "PROFILE" scope to ensure 'age' is calculated for safety routing
             scopes = set(intent_result.required_scopes)
             scopes.add("PROFILE")
             
