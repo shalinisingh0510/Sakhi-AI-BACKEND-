@@ -259,7 +259,7 @@ class OpenAIProvider:
 
 class GroqProvider(OpenAIProvider):
     """Calls the Groq API using the OpenAI SDK."""
-    def __init__(self, api_key: str, model: str = "llama3-8b-8192") -> None:
+    def __init__(self, api_key: str, model: str = "llama-3.1-8b-instant") -> None:
         super().__init__(api_key=api_key, model=model, base_url="https://api.groq.com/openai/v1")
         self._supports_structured_outputs = False
 
