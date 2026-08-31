@@ -1,4 +1,4 @@
-﻿from fastapi import Depends, Header, HTTPException, Query, Request, status
+from fastapi import Depends, Header, HTTPException, Query, Request, status
 
 from app.services.ai import AIService
 from app.services.analytics import AnalyticsService
@@ -73,6 +73,23 @@ def get_current_user(
         return auth_service.resolve_current_user(access_token=token.strip())
     except InvalidTokenError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+
+
+def get_current_user_optional(
+    authorization: str | None = Header(default=None),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> StoredUser | None:
+    if not authorization:
+        return None
+
+    scheme, _, token = authorization.partition(' ')
+    if scheme.lower() != 'bearer' or not token.strip():
+        return None
+
+    try:
+        return auth_service.resolve_current_user(access_token=token.strip())
+    except InvalidTokenError:
+        return None
 
 
 def require_roles(*roles: str):
