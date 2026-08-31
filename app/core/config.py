@@ -68,6 +68,16 @@ class Settings(BaseSettings):
     email_from: str = "noreply@sakhiai.com"
     email_use_tls: bool = True
 
+    # Voice STT Settings (Phase 16)
+    stt_provider: str = "groq" # groq, openai, rule-based
+    stt_model: str = "whisper-large-v3"
+    stt_max_audio_size_mb: int = 25
+    stt_timeout_seconds: int = 60
+    stt_supported_languages: str | list[str] = Field(
+        default_factory=lambda: ["en", "hi", "mr"]
+    )
+    stt_rate_limit_per_minute: int = 10
+
     # RAG & Embedding Settings
     embedding_provider: str = "gemini" # "gemini", "openai"
     embedding_model: str = "models/text-embedding-004"
@@ -107,7 +117,16 @@ class Settings(BaseSettings):
             return [str(origin).strip() for origin in value if str(origin).strip()]
         return ["http://localhost:3000"]
 
-
+    @field_validator("stt_supported_languages", mode="before")
+    @classmethod
+    def parse_stt_supported_languages(cls, value: object) -> list[str]:
+        if value is None:
+            return ["en", "hi", "mr"]
+        if isinstance(value, str):
+            return [lang.strip().lower() for lang in value.split(",") if lang.strip()]
+        if isinstance(value, list):
+            return [str(lang).strip().lower() for lang in value if str(lang).strip()]
+        return ["en", "hi", "mr"]
 
     @field_validator(
         "access_token_minutes",
@@ -173,3 +192,4 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     return Settings()
 
+settings = get_settings()
