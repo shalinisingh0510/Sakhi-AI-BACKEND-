@@ -14,6 +14,8 @@ from typing import List, Optional, Tuple
 from sqlalchemy import and_, func, select, String
 from sqlalchemy.orm import Session, selectinload
 
+from app.schemas.learning import TopicCreate, TopicUpdate, SubtopicCreate, SubtopicUpdate
+
 from app.models.learning import (
     VALID_COMBINATIONS,
     LearningContent,
@@ -93,6 +95,64 @@ class LearningService:
             query = query.where(Topic.is_active.is_(True))
         query = query.order_by(Topic.display_order)
         return list(self._db.scalars(query).all())
+
+    def create_topic(self, data: TopicCreate) -> Topic:
+        topic = Topic(
+            name=data.name,
+            slug=data.slug,
+            description=data.description,
+            icon=data.icon,
+            display_order=data.display_order,
+            is_active=data.is_active,
+        )
+        self._db.add(topic)
+        self._db.commit()
+        self._db.refresh(topic)
+        return topic
+
+    def update_topic(self, topic_id: str, data: TopicUpdate) -> Topic:
+        topic = self._db.get(Topic, topic_id)
+        if not topic:
+            raise TopicNotFoundError(f"Topic '{topic_id}' not found.")
+        
+        update_data = data.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(topic, key, value)
+            
+        self._db.commit()
+        self._db.refresh(topic)
+        return topic
+
+    def create_subtopic(self, topic_id: str, data: SubtopicCreate) -> Subtopic:
+        topic = self._db.get(Topic, topic_id)
+        if not topic:
+            raise TopicNotFoundError(f"Topic '{topic_id}' not found.")
+            
+        subtopic = Subtopic(
+            topic_id=topic_id,
+            name=data.name,
+            slug=data.slug,
+            description=data.description,
+            display_order=data.display_order,
+            is_active=data.is_active,
+        )
+        self._db.add(subtopic)
+        self._db.commit()
+        self._db.refresh(subtopic)
+        return subtopic
+
+    def update_subtopic(self, subtopic_id: str, data: SubtopicUpdate) -> Subtopic:
+        subtopic = self._db.get(Subtopic, subtopic_id)
+        if not subtopic:
+            raise TopicNotFoundError(f"Subtopic '{subtopic_id}' not found.")
+            
+        update_data = data.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(subtopic, key, value)
+            
+        self._db.commit()
+        self._db.refresh(subtopic)
+        return subtopic
 
     def get_topic_by_slug(self, slug: str) -> Topic:
         """Return a single topic by slug (with subtopics)."""
@@ -195,6 +255,7 @@ class LearningService:
                 LearningContent.title.ilike(like_term)
                 | LearningContent.description.ilike(like_term)
                 | func.cast(LearningContent.tags, String).ilike(like_term)
+                | func.cast(LearningContent.body, String).ilike(like_term)
             )
         if topic_id:
             query = query.where(LearningContent.topic_id == topic_id)
@@ -680,7 +741,13 @@ class LearningService:
         if topic_id:
             query = query.where(LearningContent.topic_id == topic_id)
         if search:
-            query = query.where(LearningContent.title.ilike(f"%{search}%"))
+            like_term = f"%{search}%"
+            query = query.where(
+                LearningContent.title.ilike(like_term)
+                | LearningContent.description.ilike(like_term)
+                | func.cast(LearningContent.tags, String).ilike(like_term)
+                | func.cast(LearningContent.body, String).ilike(like_term)
+            )
 
         total_count = self._db.scalar(
             select(func.count()).select_from(query.subquery())

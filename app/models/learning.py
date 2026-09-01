@@ -424,3 +424,42 @@ class LearningModuleItem(Base):
         Index("ix_learning_module_items_content_id", "content_id"),
         UniqueConstraint("module_id", "content_id", name="uq_module_content_item"),
     )
+
+
+# ---------------------------------------------------------------------------
+# Internet Research / Source Traceability
+# ---------------------------------------------------------------------------
+
+class ResearchSource(Base):
+    """Phase 2: Source Traceability and Internet Research records."""
+    __tablename__ = "research_sources"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    canonical_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    domain: Mapped[str] = mapped_column(String(255), nullable=False)
+    title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    publisher: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="INTERNET")
+    
+    accessed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, server_default=func.now())
+    extracted_facts: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    related_content: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
+    raw_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        server_default=func.now(),
+        onupdate=datetime.utcnow,
+    )
+
+    __table_args__ = (
+        Index("ix_research_sources_domain", "domain"),
+        Index("ix_research_sources_canonical_url", "canonical_url"),
+        Index("ix_research_sources_content_hash", "content_hash"),
+    )

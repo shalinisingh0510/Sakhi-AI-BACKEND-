@@ -25,6 +25,18 @@ from app.services.monetization_service import MonetizationService
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_db
 
+from app.api.v1.endpoints.learning import get_learning_service
+from app.services.learning_service import LearningService, TopicNotFoundError
+from app.schemas.learning import (
+    TopicCreate, TopicUpdate, SubtopicCreate, SubtopicUpdate, 
+    TopicResponse, SubtopicResponse, 
+    ResearchSourceCreate, ResearchSourceResponse,
+    ArticleGenerationResponse, LocalizationRequest, FactValidationResponse
+)
+from app.services.research_service import ResearchService
+from app.services.content_generation_service import ContentGenerationService
+import os
+
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
@@ -261,3 +273,120 @@ def delete_lesson(
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
+
+# ---------------------------------------------------------------------------
+# Taxonomy Admin Endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/learning/topics", response_model=TopicResponse, status_code=status.HTTP_201_CREATED)
+def create_topic(
+    payload: TopicCreate,
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    learning_service: LearningService = Depends(get_learning_service),
+) -> TopicResponse:
+    return learning_service.create_topic(payload)
+
+
+@router.put("/learning/topics/{topic_id}", response_model=TopicResponse)
+def update_topic(
+    topic_id: str,
+    payload: TopicUpdate,
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    learning_service: LearningService = Depends(get_learning_service),
+) -> TopicResponse:
+    try:
+        return learning_service.update_topic(topic_id, payload)
+    except TopicNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.post("/learning/topics/{topic_id}/subtopics", response_model=SubtopicResponse, status_code=status.HTTP_201_CREATED)
+def create_subtopic(
+    topic_id: str,
+    payload: SubtopicCreate,
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    learning_service: LearningService = Depends(get_learning_service),
+) -> SubtopicResponse:
+    try:
+        return learning_service.create_subtopic(topic_id, payload)
+    except TopicNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.put("/learning/subtopics/{subtopic_id}", response_model=SubtopicResponse)
+def update_subtopic(
+    subtopic_id: str,
+    payload: SubtopicUpdate,
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    learning_service: LearningService = Depends(get_learning_service),
+) -> SubtopicResponse:
+    try:
+        return learning_service.update_subtopic(subtopic_id, payload)
+    except TopicNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------------------
+# Research Ingestion Admin Endpoints (Phase 2)
+# ---------------------------------------------------------------------------
+
+def get_research_service(db: AsyncSession = Depends(get_db)) -> ResearchService:
+    return ResearchService(db)
+
+@router.post("/research/ingest", response_model=ResearchSourceResponse, status_code=status.HTTP_201_CREATED)
+async def ingest_research(
+    payload: ResearchSourceCreate,
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    research_service: ResearchService = Depends(get_research_service),
+) -> ResearchSourceResponse:
+    return await research_service.ingest_url(payload.url)
+
+@router.get("/research", response_model=list[ResearchSourceResponse])
+def list_research(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    research_service: ResearchService = Depends(get_research_service),
+):
+    return research_service.list_sources(skip=skip, limit=limit)
+
+@router.get("/research/{source_id}", response_model=ResearchSourceResponse)
+def get_research_source(
+    source_id: str,
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    research_service: ResearchService = Depends(get_research_service),
+):
+    return research_service.get_source(source_id)
+
+# ---------------------------------------------------------------------------
+# Content Generation & Localization Admin Endpoints (Phase 3)
+# ---------------------------------------------------------------------------
+
+def get_generation_service(db: AsyncSession = Depends(get_db)) -> ContentGenerationService:
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    return ContentGenerationService(db=db, api_key=api_key)
+
+@router.post("/research/{source_id}/generate", response_model=ArticleGenerationResponse, status_code=status.HTTP_201_CREATED)
+def generate_english_article(
+    source_id: str,
+    current_user: StoredUser = Depends(require_roles("admin")),
+    gen_service: ContentGenerationService = Depends(get_generation_service),
+):
+    return gen_service.generate_english_article(source_id, author_id=current_user.id)
+
+@router.post("/learning/{content_id}/localize", response_model=ArticleGenerationResponse)
+def localize_article(
+    content_id: str,
+    payload: LocalizationRequest,
+    current_user: StoredUser = Depends(require_roles("admin")),
+    gen_service: ContentGenerationService = Depends(get_generation_service),
+):
+    return gen_service.localize_article(content_id, payload.target_language, author_id=current_user.id)
+
+@router.post("/learning/{content_id}/validate", response_model=FactValidationResponse)
+def validate_article(
+    content_id: str,
+    _current_user: StoredUser = Depends(require_roles("admin")),
+    gen_service: ContentGenerationService = Depends(get_generation_service),
+):
+    return gen_service.validate_content(content_id)
