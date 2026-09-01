@@ -14,7 +14,11 @@ from app.schemas.monetization import SponsorResponse
 # ---------------------------------------------------------------------------
 ContentType = Literal["VIDEO", "ARTICLE", "POST", "TUTORIAL"]
 SourceType = Literal["YOUTUBE", "PRIVATE_VIDEO", "INTERNAL", "INSTAGRAM"]
-ContentStatus = Literal["DRAFT", "PUBLISHED", "ARCHIVED", "PENDING_REVIEW", "REJECTED", "UNDER_REVIEW", "MEDICALLY_REVIEWED", "NEEDS_REVIEW"]
+ContentStatus = Literal[
+    "DRAFT", "PUBLISHED", "ARCHIVED", "PENDING_REVIEW", "REJECTED", "UNDER_REVIEW", 
+    "MEDICALLY_REVIEWED", "NEEDS_REVIEW", "RESEARCHED", "FACT_CHECKED", "READY_FOR_REVIEW", 
+    "ADMIN_APPROVED"
+]
 Audience = Literal["ALL", "TEEN", "ADULT"]
 
 VALID_COMBINATIONS: frozenset[tuple[str, str]] = frozenset(
@@ -51,6 +55,32 @@ class SubtopicResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+# ---------------------------------------------------------------------------
+# Research Source (Phase 2)
+# ---------------------------------------------------------------------------
+
+class ResearchSourceCreate(BaseModel):
+    url: str = Field(..., max_length=2048)
+
+class ResearchSourceResponse(BaseModel):
+    id: str
+    url: str
+    canonical_url: Optional[str] = None
+    domain: str
+    title: Optional[str] = None
+    publisher: Optional[str] = None
+    source_type: str
+    accessed_at: datetime
+    extracted_facts: Optional[Any] = None
+    content_hash: Optional[str] = None
+    related_content: Optional[Any] = None
+    raw_content: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TopicResponse(BaseModel):
     id: str
     name: str
@@ -69,11 +99,42 @@ class TopicsListResponse(BaseModel):
     total: int
 
 
+class TopicCreate(BaseModel):
+    name: str = Field(..., max_length=100)
+    slug: str = Field(..., max_length=100)
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    display_order: int = 0
+    is_active: bool = True
+
+class TopicUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=100)
+    slug: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    display_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+class SubtopicCreate(BaseModel):
+    name: str = Field(..., max_length=100)
+    slug: str = Field(..., max_length=100)
+    description: Optional[str] = None
+    display_order: int = 0
+    is_active: bool = True
+
+class SubtopicUpdate(BaseModel):
+    name: Optional[str] = Field(None, max_length=100)
+    slug: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+    display_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
 # ---------------------------------------------------------------------------
 # Content Body Block schemas (for ARTICLE / POST / TUTORIAL)
 # ---------------------------------------------------------------------------
 VALID_BLOCK_TYPES = frozenset(
-    ["heading", "paragraph", "image", "video", "important_box", "list", "callout"]
+    ["text", "heading", "bullet_list", "numbered_list", "warning", "tip", "myth_fact", "faq", "comparison", "callout", "image"]
 )
 
 
@@ -378,4 +439,22 @@ class LearningPathProgressResponse(BaseModel):
     progress_percent: int
     # Mapping of module_id -> { completed: int, total: int }
     module_progress: Dict[str, Dict[str, int]]
+
+# ---------------------------------------------------------------------------
+# Content Generation & Localization (Phase 3)
+# ---------------------------------------------------------------------------
+
+class LocalizationRequest(BaseModel):
+    target_language: str = Field(..., max_length=10)
+
+class FactValidationResponse(BaseModel):
+    is_valid: bool
+    status: ContentStatus
+    issues: List[str] = Field(default_factory=list)
+
+class ArticleGenerationResponse(BaseModel):
+    message: str
+    content_id: str
+    status: ContentStatus
+    validation_issues: List[str] = Field(default_factory=list)
 
