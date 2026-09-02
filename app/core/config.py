@@ -35,6 +35,24 @@ class Settings(BaseSettings):
     gemini_api_key: SecretStr | None = Field(default=None)
     groq_api_key: SecretStr | None = Field(default=None)
     openai_model: str = "gpt-4o-mini"
+    
+    # Multi-LLM Provider System (Phase 17)
+    llm_primary_provider: str = "gemini"
+    llm_fallback_providers: str | list[str] = Field(
+        default_factory=lambda: ["groq", "openrouter", "deepseek", "qwen"]
+    )
+    openrouter_api_key: SecretStr | None = Field(default=None)
+    deepseek_api_key: SecretStr | None = Field(default=None)
+    qwen_api_key: SecretStr | None = Field(default=None)
+    openrouter_free_model_1: str = "google/gemma-2-9b-it:free"
+    openrouter_free_model_2: str = "mistralai/mistral-7b-instruct:free"
+    deepseek_model: str = "deepseek-chat"
+    qwen_model: str = "qwen-plus"
+    llm_allow_paid_fallback: bool = True
+    llm_max_retries: int = 2
+    llm_circuit_breaker_failures: int = 3
+    llm_circuit_breaker_cooldown_seconds: int = 300
+    
     sentry_dsn: str | None = Field(default=None)
     conversation_history_limit: int = 8
     secret_key: SecretStr = Field(
@@ -127,6 +145,17 @@ class Settings(BaseSettings):
         if isinstance(value, list):
             return [str(lang).strip().lower() for lang in value if str(lang).strip()]
         return ["en", "hi", "mr"]
+
+    @field_validator("llm_fallback_providers", mode="before")
+    @classmethod
+    def parse_llm_fallback_providers(cls, value: object) -> list[str]:
+        if value is None:
+            return ["groq", "openrouter", "deepseek", "qwen"]
+        if isinstance(value, str):
+            return [provider.strip().lower() for provider in value.split(",") if provider.strip()]
+        if isinstance(value, list):
+            return [str(provider).strip().lower() for provider in value if str(provider).strip()]
+        return ["groq", "openrouter", "deepseek", "qwen"]
 
     @field_validator(
         "access_token_minutes",
