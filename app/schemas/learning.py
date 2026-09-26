@@ -138,19 +138,18 @@ VALID_BLOCK_TYPES = frozenset(
 )
 
 
-def validate_body_blocks(body: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
-    if body is None:
-        return None
-    for i, block in enumerate(body):
-        if not isinstance(block, dict):
-            raise ValueError(f"Block {i} must be a dict.")
-        if "type" not in block:
-            raise ValueError(f"Block {i} is missing 'type'.")
-        if block["type"] not in VALID_BLOCK_TYPES:
-            raise ValueError(
-                f"Block {i} has unknown type '{block['type']}'. "
-                f"Valid types: {VALID_BLOCK_TYPES}"
-            )
+def validate_body_blocks(body: Any) -> Any:
+    if body is None or isinstance(body, dict):
+        return body
+    if isinstance(body, list):
+        for i, block in enumerate(body):
+            if not isinstance(block, dict):
+                continue
+            if "type" in block and block["type"] not in VALID_BLOCK_TYPES:
+                raise ValueError(
+                    f"Block {i} has unknown type '{block['type']}'. "
+                    f"Valid types: {VALID_BLOCK_TYPES}"
+                )
     return body
 
 
@@ -170,8 +169,8 @@ class LearningContentBase(BaseModel):
     # Thumbnail: media_files.id
     thumbnail_file_id: Optional[str] = None
 
-    # Article/Post/Tutorial body blocks — list of typed blocks
-    body: Optional[List[Dict[str, Any]]] = None
+    # Article/Post/Tutorial body — typed list of blocks or structured AI dict
+    body: Optional[Any] = None
 
     category: str = Field(..., max_length=50)
     tags: List[str] = Field(default_factory=list)
@@ -240,7 +239,7 @@ class LearningContentUpdate(BaseModel):
     media_url: Optional[str] = Field(None, max_length=500)
     media_file_id: Optional[str] = None
     thumbnail_file_id: Optional[str] = None
-    body: Optional[List[Dict[str, Any]]] = None
+    body: Optional[Any] = None
     category: Optional[str] = Field(None, max_length=50)
     tags: Optional[List[str]] = None
     language: Optional[str] = Field(None, max_length=10)
@@ -277,7 +276,7 @@ class LearningContentResponse(BaseModel):
     thumbnail_file_id: Optional[str]
     thumbnail_url: Optional[str] = None
     media_file_url: Optional[str] = None
-    body: Optional[List[Dict[str, Any]]]
+    body: Optional[Any] = None
     category: str
     tags: List[str]
     language: str

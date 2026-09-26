@@ -64,10 +64,11 @@ class ContentIngestionService:
         )
         
         eng_response = self.llm_manager.generate_structured(
-            system_prompt="You are Sakhi, a medical content writer. You write accurate, safe, and original health articles. Output JSON matching the schema.",
+            system_prompt="You are Sakhi, a medical content writer. You write accurate, safe, and original health articles for Indian women. Output JSON matching the schema.",
             user_prompt=english_prompt,
             response_model=GeneratedArticle,
-            task=TaskType.CONTENT_GENERATION
+            task=TaskType.CONTENT_GENERATION,
+            max_tokens=4000
         )
         
         eng_article = GeneratedArticle.model_validate(eng_response.structured_data)

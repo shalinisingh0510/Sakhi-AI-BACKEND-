@@ -21,7 +21,9 @@ This repository contains the backend for **Sakhi AI**, an AI-powered multilingua
    ```
 
 2. **Configure `.env`**:
-   Ensure `SAKHI_OPENAI_API_KEY`, `SAKHI_DATABASE_PATH`, and `SAKHI_REDIS_URL` are set.
+   Ensure `SAKHI_DATABASE_URL` points to PostgreSQL, and configure the AI and Redis
+   variables required by your environment. The learning API uses PostgreSQL through
+   SQLAlchemy; `SAKHI_DATABASE_PATH` is not read by this backend.
 
 3. **Run with Docker Compose**:
    ```bash
