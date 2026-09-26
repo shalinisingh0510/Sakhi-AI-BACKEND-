@@ -44,8 +44,8 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr | None = Field(default=None)
     deepseek_api_key: SecretStr | None = Field(default=None)
     qwen_api_key: SecretStr | None = Field(default=None)
-    openrouter_free_model_1: str = "google/gemma-2-9b-it:free"
-    openrouter_free_model_2: str = "mistralai/mistral-7b-instruct:free"
+    openrouter_free_model_1: str = "google/gemma-4-31b-it:free"
+    openrouter_free_model_2: str = "nex-agi/nex-n2.5-mini:free"
     deepseek_model: str = "deepseek-chat"
     qwen_model: str = "qwen-plus"
     llm_allow_paid_fallback: bool = True

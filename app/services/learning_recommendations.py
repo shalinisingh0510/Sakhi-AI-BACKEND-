@@ -106,7 +106,9 @@ class LearningRecommendationService:
 
             # FRESHNESS
             if content.created_at:
-                age_days = (now - content.created_at).total_seconds() / 86400
+                c_at = content.created_at.replace(tzinfo=None) if hasattr(content.created_at, "tzinfo") and content.created_at.tzinfo else content.created_at
+                n_at = now.replace(tzinfo=None) if hasattr(now, "tzinfo") and now.tzinfo else now
+                age_days = (n_at - c_at).total_seconds() / 86400
                 if age_days <= 14:
                     score += 10.0
                     if not reasons:

@@ -72,9 +72,9 @@ class LearningService:
             except Exception:
                 pass
 
-        if content.body:
+        if content.body and isinstance(content.body, list):
             for block in content.body:
-                if block.get("media_file_id"):
+                if isinstance(block, dict) and block.get("media_file_id"):
                     try:
                         block["url"] = self._storage_service.generate_presigned_download_url(
                             block["media_file_id"]

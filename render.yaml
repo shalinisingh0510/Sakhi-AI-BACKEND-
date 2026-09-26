@@ -7,8 +7,10 @@ services:
     envVars:
       - key: SAKHI_ENVIRONMENT
         value: production
-      - key: SAKHI_DATABASE_PATH
-        value: /var/lib/sakhi-ai/production.sqlite3
+      # Required by app.core.config. Configure this with the PostgreSQL
+      # connection string for the database that contains the learning data.
+      - key: SAKHI_DATABASE_URL
+        sync: false
       - key: SAKHI_REDIS_URL
         value: redis://red-xxxxxxxxxxxxxxxxxxxx:6379
       - key: SAKHI_OPENAI_API_KEY
