@@ -23,7 +23,7 @@ class InvalidFeedbackError(FeedbackError):
     pass
 
 
-@dataclass(slots=True)
+@dataclass()
 class StoredFeedback:
     id: str
     user_id: str

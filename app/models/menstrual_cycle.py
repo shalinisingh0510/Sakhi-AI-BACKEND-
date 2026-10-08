@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Optional
 """SQLAlchemy ORM models for the Menstrual Cycle domain.
 
 Tables:
@@ -18,7 +20,6 @@ Relationships:
   users → health_profiles → cycle_predictions
 """
 
-from __future__ import annotations
 
 from datetime import date, datetime
 
@@ -60,7 +61,7 @@ class PeriodLog(Base):
     # User-entered dates — store as DATE only (not TIMESTAMPTZ).
     # A period start on "August 10" is a calendar date, not a UTC instant.
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     # Controlled vocabulary for flow intensity.
     # NEVER accept arbitrary strings from the client.
@@ -69,7 +70,7 @@ class PeriodLog(Base):
     )
 
     # Free-text notes — NEVER logged.
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -122,13 +123,13 @@ class MenstrualCycle(Base):
     cycle_start_date: Mapped[date] = mapped_column(Date, nullable=False)
     # The day before the next period started (i.e. last day of this cycle).
     # NULL until the next period is logged.
-    cycle_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    cycle_end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     # Derived integers — computed by cycle_engine.
-    cycle_length_days: Mapped[int | None] = mapped_column(
+    cycle_length_days: Mapped[Optional[int]] = mapped_column(
         sa.Integer, nullable=True
     )
-    period_duration_days: Mapped[int | None] = mapped_column(
+    period_duration_days: Mapped[Optional[int]] = mapped_column(
         sa.Integer, nullable=True
     )
 
@@ -180,13 +181,13 @@ class CyclePrediction(Base):
     health_profile_id: Mapped[str] = mapped_column(String(36), nullable=False)
 
     # Optional back-reference to the cycle that anchored this prediction.
-    reference_cycle_id: Mapped[str | None] = mapped_column(
+    reference_cycle_id: Mapped[Optional[str]] = mapped_column(
         String(36), nullable=True
     )
 
     prediction_type: Mapped[str] = mapped_column(String(30), nullable=False)
     predicted_start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    predicted_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    predicted_end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     # LOW | MEDIUM | HIGH
     confidence: Mapped[str] = mapped_column(String(10), nullable=False)

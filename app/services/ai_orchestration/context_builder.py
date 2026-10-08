@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import List
 from app.schemas.knowledge import RetrievedChunk, CompressedEvidence
 

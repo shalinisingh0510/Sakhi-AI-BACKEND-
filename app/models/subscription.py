@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Optional
 """SQLAlchemy ORM models for Subscriptions and Entitlements.
 
 Tables:
@@ -5,7 +7,6 @@ Tables:
   user_subscriptions  — Track user's active/past_due subscriptions.
 """
 
-from __future__ import annotations
 
 from datetime import datetime
 from uuid import uuid4
@@ -33,7 +34,7 @@ class SubscriptionPlan(Base):
 
     id: Mapped[str] = mapped_column(String(50), primary_key=True)  # e.g., "plan_pro_monthly"
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     price: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="INR")
     interval: Mapped[str] = mapped_column(String(20), nullable=False, default="month")  # month, year, lifetime
@@ -68,13 +69,13 @@ class UserSubscription(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
     
     provider: Mapped[str] = mapped_column(String(50), nullable=False, default="mock")  # razorpay, stripe, mock
-    provider_subscription_id: Mapped[str | None] = mapped_column(String(100), nullable=True, unique=True)
+    provider_subscription_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, unique=True)
     
-    current_period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    current_period_start: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    current_period_end: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     
     cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    canceled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -32,7 +32,7 @@ class InvalidConversationMessageError(ConversationError):
     pass
 
 
-@dataclass(slots=True)
+@dataclass()
 class StoredConversation:
     id: str
     user_id: str
@@ -46,7 +46,7 @@ class StoredConversation:
         return ConversationSummary.model_validate(self)
 
 
-@dataclass(slots=True)
+@dataclass()
 class StoredConversationMessage:
     id: str
     conversation_id: str

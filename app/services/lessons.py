@@ -35,7 +35,7 @@ class InvalidLessonContentError(LessonError):
     pass
 
 
-@dataclass(slots=True)
+@dataclass()
 class StoredLesson:
     id: str
     slug: str

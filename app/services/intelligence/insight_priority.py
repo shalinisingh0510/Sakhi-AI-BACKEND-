@@ -1,3 +1,4 @@
+from __future__ import annotations
 import enum
 from typing import List, Optional
 from sqlalchemy.orm import Session

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Health domain ORM models — architectural contract only.
 
 This module defines the **canonical HealthEvent** model that all future
@@ -12,7 +13,6 @@ When ready to activate:
 4.  Run ``alembic upgrade head``
 """
 
-from __future__ import annotations
 
 # ---------------------------------------------------------------------------
 # The model below is the ARCHITECTURAL CONTRACT for the canonical health

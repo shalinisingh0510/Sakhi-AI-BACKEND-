@@ -2,6 +2,7 @@
 Pydantic schemas for the Sakhi AI content ingestion pipeline.
 These define the exact JSON structures that the LLM must return.
 """
+from __future__ import annotations
 from typing import List, Optional
 from pydantic import BaseModel, Field
 

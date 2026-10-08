@@ -28,7 +28,7 @@ class CacheBackendProtocol(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass()
 class _CacheEntry:
     value: str
     expires_at: float | None = None

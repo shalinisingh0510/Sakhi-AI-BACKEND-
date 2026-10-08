@@ -15,7 +15,7 @@ Design notes:
 from __future__ import annotations
 
 from datetime import date, datetime
-from enum import StrEnum
+from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -26,7 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # ---------------------------------------------------------------------------
 
 
-class FoodCategory(StrEnum):
+class FoodCategory(str, Enum):
     GRAINS = "GRAINS"
     PULSES = "PULSES"
     VEGETABLES = "VEGETABLES"
@@ -46,21 +46,21 @@ class FoodCategory(StrEnum):
     OTHER = "OTHER"
 
 
-class DietType(StrEnum):
+class DietType(str, Enum):
     VEGETARIAN = "VEGETARIAN"
     VEGAN = "VEGAN"
     EGGETARIAN = "EGGETARIAN"
     NON_VEGETARIAN = "NON_VEGETARIAN"
 
 
-class DataQuality(StrEnum):
+class DataQuality(str, Enum):
     VERIFIED = "VERIFIED"
     ESTIMATED = "ESTIMATED"
     DEMO = "DEMO"
     USER_GENERATED = "USER_GENERATED"
 
 
-class MealType(StrEnum):
+class MealType(str, Enum):
     BREAKFAST = "BREAKFAST"
     LUNCH = "LUNCH"
     DINNER = "DINNER"

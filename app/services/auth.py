@@ -45,7 +45,7 @@ class UserNotFoundError(AuthError):
     pass
 
 
-@dataclass(slots=True)
+@dataclass()
 class StoredUser:
     id: str
     name: str
@@ -105,7 +105,7 @@ class AuthStoreProtocol(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass()
 class AuthSession:
     user: StoredUser
     access_token: str

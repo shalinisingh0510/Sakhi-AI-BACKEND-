@@ -1,9 +1,10 @@
+from __future__ import annotations
+from typing import Optional
 """SQLAlchemy ORM models for Mood Tracking.
 
 mood_logs:
   Records daily emotional states.
 """
-from __future__ import annotations
 from datetime import date, datetime
 from sqlalchemy import Date, DateTime, Integer, String, Text, Index, func, UniqueConstraint, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,10 +21,10 @@ class MoodLog(Base):
     intensity: Mapped[str] = mapped_column(String(20), nullable=False)
     
     log_date: Mapped[date] = mapped_column(Date, nullable=False)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    cycle_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("menstrual_cycles.id", ondelete="SET NULL"), nullable=True)
-    cycle_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cycle_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("menstrual_cycles.id", ondelete="SET NULL"), nullable=True)
+    cycle_day: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

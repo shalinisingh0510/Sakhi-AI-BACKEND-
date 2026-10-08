@@ -2,6 +2,7 @@
 Gemini provider using the new google-genai SDK (google.genai).
 Replaces the deprecated google.generativeai package.
 """
+from __future__ import annotations
 import json
 import logging
 from typing import Type, TypeVar, Any

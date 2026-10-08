@@ -1,4 +1,5 @@
 """Longitudinal Data Service to retrieve time-bounded datasets."""
+from __future__ import annotations
 
 from datetime import date
 from typing import Sequence, Optional

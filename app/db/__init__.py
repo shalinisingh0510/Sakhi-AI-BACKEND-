@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .ai_store import PostgresConversationStore
 from .analytics_store import PostgresAnalyticsStore
 from .auth_store import PostgresAuthStore

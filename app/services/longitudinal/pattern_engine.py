@@ -1,4 +1,5 @@
 """Symptom Pattern Engine to detect recurring issues and cycle correlations."""
+from __future__ import annotations
 
 from typing import Sequence
 from collections import Counter

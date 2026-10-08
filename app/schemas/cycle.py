@@ -10,7 +10,7 @@ are NEVER returned directly to clients.
 from __future__ import annotations
 
 from datetime import date, datetime
-from enum import StrEnum
+from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -21,27 +21,27 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # ---------------------------------------------------------------------------
 
 
-class FlowLevel(StrEnum):
+class FlowLevel(str, Enum):
     LIGHT = "LIGHT"
     MEDIUM = "MEDIUM"
     HEAVY = "HEAVY"
     UNKNOWN = "UNKNOWN"
 
 
-class PredictionType(StrEnum):
+class PredictionType(str, Enum):
     NEXT_PERIOD = "NEXT_PERIOD"
     OVULATION = "OVULATION"
     FERTILE_WINDOW_START = "FERTILE_WINDOW_START"
     FERTILE_WINDOW_END = "FERTILE_WINDOW_END"
 
 
-class ConfidenceLevel(StrEnum):
+class ConfidenceLevel(str, Enum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
 
 
-class DataQuality(StrEnum):
+class DataQuality(str, Enum):
     """Qualitative description of available data for predictions."""
     NO_DATA = "NO_DATA"           # 0 periods logged
     INSUFFICIENT = "INSUFFICIENT"  # 1 period

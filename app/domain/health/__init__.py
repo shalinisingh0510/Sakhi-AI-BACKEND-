@@ -11,6 +11,7 @@ Sub-modules:
 - ``integrations``: Abstract wearable/health data provider
 - ``privacy``: Health data access control boundary
 """
+from __future__ import annotations
 
 from app.domain.health.age_policy import AgePolicy
 from app.domain.health.constants import EventSource, EventType, WELLNESS_DISCLAIMER

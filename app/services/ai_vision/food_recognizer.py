@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import select
