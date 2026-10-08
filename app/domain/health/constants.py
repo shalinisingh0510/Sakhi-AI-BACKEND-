@@ -7,7 +7,7 @@ application.
 
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum
 
 
 # ---------------------------------------------------------------------------
@@ -26,7 +26,7 @@ WELLNESS_DISCLAIMER = (
 # Event sources — where health data originates.
 # ---------------------------------------------------------------------------
 
-class EventSource(StrEnum):
+class EventSource(str, Enum):
     """Origin of a health event."""
 
     MANUAL = "manual"
@@ -40,7 +40,7 @@ class EventSource(StrEnum):
 # Event types — what kind of health data it represents.
 # ---------------------------------------------------------------------------
 
-class EventType(StrEnum):
+class EventType(str, Enum):
     """Canonical event types for the health domain."""
 
     STEPS = "steps"

@@ -30,7 +30,7 @@ class InvalidProgressError(ProgressError):
     pass
 
 
-@dataclass(slots=True)
+@dataclass()
 class StoredLessonProgress:
     id: str
     user_id: str

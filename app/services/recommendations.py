@@ -14,14 +14,14 @@ from app.services.progress import ProgressService
 SUPPORTED_ENGAGEMENT_EVENTS = {"lesson_view", "lesson_start", "lesson_complete"}
 
 
-@dataclass(slots=True)
+@dataclass()
 class _RecommendationCandidate:
     lesson: LessonSummary
     score: float
     reason: str
 
 
-@dataclass(slots=True)
+@dataclass()
 class _EngagementBucket:
     lesson_views: int = 0
     lesson_starts: int = 0

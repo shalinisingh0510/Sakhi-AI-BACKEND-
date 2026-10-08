@@ -28,7 +28,7 @@ class InvalidNotificationError(NotificationError):
     pass
 
 
-@dataclass(slots=True)
+@dataclass()
 class StoredNotification:
     id: str
     user_id: str

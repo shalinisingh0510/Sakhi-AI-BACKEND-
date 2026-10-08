@@ -3,6 +3,7 @@
 Provides a base repository class with common CRUD operations for
 SQLAlchemy models, and re-exports concrete repositories.
 """
+from __future__ import annotations
 
 from app.repositories.base import BaseRepository
 from app.repositories.health import HealthConditionRepository, HealthProfileRepository

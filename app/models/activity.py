@@ -1,3 +1,4 @@
+from __future__ import annotations
 """SQLAlchemy ORM models for the Activity and Energy domain (Phase 6/7).
 
 Tables:
@@ -9,10 +10,9 @@ Design notes:
   * No user-provided explicit calorie values unless explicitly overriding (MANUAL source).
 """
 
-from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -55,7 +55,7 @@ class ActivityLog(Base):
     )
     
     # Optional link to cycle for longitudinal analysis
-    cycle_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    cycle_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
 
     # Core activity data
     activity_date: Mapped[date] = mapped_column(Date, nullable=False)
@@ -66,23 +66,23 @@ class ActivityLog(Base):
     )
     
     # Optional metrics
-    distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
-    steps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    distance_km: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    steps: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     # Backend-calculated estimate
     estimated_calories_burned: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     
     # Provenance
     source: Mapped[str] = mapped_column(String(30), nullable=False, default=ActivitySource.ESTIMATED)
-    calculation_method: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    algorithm_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    calculation_method: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    algorithm_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     
     # Wearable/Import metadata (for Phase 8+)
-    external_source: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    external_record_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    external_source: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    external_record_id: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -1,4 +1,5 @@
 """Health Context Builder to assemble data for AI personalization."""
+from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Literal, Sequence

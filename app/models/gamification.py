@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Optional
 from datetime import datetime
 from uuid import uuid4
 from sqlalchemy import Integer, String, DateTime, ForeignKey, Index, func, Boolean
@@ -18,7 +20,7 @@ class UserGamification(Base):
     current_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     longest_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     
-    last_checkin_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_checkin_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

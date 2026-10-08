@@ -1,3 +1,4 @@
+from __future__ import annotations
 """SQLAlchemy ORM models for Sakhi AI.
 
 Import all model modules here so that ``Base.metadata`` discovers every

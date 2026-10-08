@@ -34,3 +34,4 @@ prometheus-fastapi-instrumentator>=7.0,<8.0
 # Testing & HTTP Clients
 httpx>=0.27.0
 httpx-sse>=0.4,<1.0
+eval_type_backport>=0.4.0

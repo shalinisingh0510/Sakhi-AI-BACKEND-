@@ -8,7 +8,7 @@ SQLAlchemy models are NEVER returned directly.
 from __future__ import annotations
 
 from datetime import date, datetime
-from enum import StrEnum
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # ---------------------------------------------------------------------------
 
 
-class ActivityLevel(StrEnum):
+class ActivityLevel(str, Enum):
     SEDENTARY = "SEDENTARY"
     LIGHT = "LIGHT"
     MODERATE = "MODERATE"
@@ -28,7 +28,7 @@ class ActivityLevel(StrEnum):
     VERY_ACTIVE = "VERY_ACTIVE"
 
 
-class DietType(StrEnum):
+class DietType(str, Enum):
     VEGETARIAN = "VEGETARIAN"
     NON_VEGETARIAN = "NON_VEGETARIAN"
     VEGAN = "VEGAN"
@@ -36,7 +36,7 @@ class DietType(StrEnum):
     OTHER = "OTHER"
 
 
-class ConditionCode(StrEnum):
+class ConditionCode(str, Enum):
     PCOS_PCOD = "PCOS_PCOD"
     ENDOMETRIOSIS = "ENDOMETRIOSIS"
     HYPOTHYROID = "HYPOTHYROID"
@@ -47,7 +47,7 @@ class ConditionCode(StrEnum):
     OTHER = "OTHER"
 
 
-class ConditionStatus(StrEnum):
+class ConditionStatus(str, Enum):
     SELF_REPORTED = "self_reported"
     CLINICIAN_REPORTED = "clinician_reported"
     RESOLVED = "resolved"

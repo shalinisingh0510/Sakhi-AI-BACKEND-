@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .ai import ConversationDetail, ConversationMessage, ConversationSummary, CreateConversationRequest, SendMessageRequest
 from .analytics import (
     AnalyticsEvent,

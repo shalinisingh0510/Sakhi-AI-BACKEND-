@@ -1,3 +1,4 @@
+from __future__ import annotations
 import uuid
 import json
 from typing import Any, Dict

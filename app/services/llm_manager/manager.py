@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 import time
 from typing import Dict, List, Optional, Type, TypeVar, Any

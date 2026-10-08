@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.v1.endpoints.admin import router as admin_router

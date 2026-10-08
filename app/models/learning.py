@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import Optional, Union, Any
 """Learning Content System models for Sakhi AI.
 
 LearningContent supports:
@@ -17,7 +19,6 @@ Architecture notes:
   - review_status is forward-compatible with the future doctor/medical review workflow.
 """
 
-from __future__ import annotations
 
 import re
 from datetime import datetime
@@ -81,8 +82,8 @@ class Topic(Base):
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    icon: Mapped[str | None] = mapped_column(String(10), nullable=True)  # emoji
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    icon: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # emoji
     display_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
 
@@ -120,7 +121,7 @@ class Subtopic(Base):
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     display_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
 
@@ -156,7 +157,7 @@ class LearningContent(Base):
         String(36), primary_key=True, default=lambda: str(uuid4())
     )
     title: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # VIDEO, ARTICLE, POST, TUTORIAL
     content_type: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -165,16 +166,16 @@ class LearningContent(Base):
     source_type: Mapped[str] = mapped_column(String(20), nullable=False)
 
     # For YOUTUBE: the full URL (e.g. https://www.youtube.com/watch?v=XXXXX)
-    media_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    media_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     # For PRIVATE_VIDEO: references media_files.id (psycopg-managed, NOT Alembic FK)
-    media_file_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    media_file_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     # Thumbnail: also references media_files.id
-    thumbnail_file_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    thumbnail_file_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
     # Structured JSON body for ARTICLE / POST / TUTORIAL content blocks
-    body: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    body: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
     # Content classification — category is kept for backward compatibility
     category: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -184,10 +185,10 @@ class LearningContent(Base):
     language: Mapped[str] = mapped_column(String(10), default="en", server_default="en")
 
     # Phase 1: Topic taxonomy (nullable for backward compatibility)
-    topic_id: Mapped[str | None] = mapped_column(
+    topic_id: Mapped[Optional[str]] = mapped_column(
         String(36), ForeignKey("topics.id", ondelete="SET NULL"), nullable=True
     )
-    subtopic_id: Mapped[str | None] = mapped_column(
+    subtopic_id: Mapped[Optional[str]] = mapped_column(
         String(36), ForeignKey("subtopics.id", ondelete="SET NULL"), nullable=True
     )
 
@@ -198,11 +199,11 @@ class LearningContent(Base):
     )
 
     # Phase 1: Featured rank (lower = more prominent, NULL = not featured)
-    featured_rank: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    featured_rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     # Phase 1: Translation group — groups same content across languages
     # e.g. English, Hindi, Marathi versions of the same article share a group ID
-    translation_group_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    translation_group_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
 
     # Authorship — references users table id (not FK-constrained)
     author_id: Mapped[str] = mapped_column(String(36), nullable=False)
@@ -218,11 +219,11 @@ class LearningContent(Base):
 
     # Phase 8: Medical Trust
     medical_review_status: Mapped[str] = mapped_column(String(20), default="NOT_REVIEWED", server_default="NOT_REVIEWED", nullable=False)
-    medical_reviewer_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    medical_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    medical_reviewer_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    medical_reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Phase 10: Sponsorship
-    sponsor_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("sponsors.id", ondelete="SET NULL"), nullable=True)
+    sponsor_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("sponsors.id", ondelete="SET NULL"), nullable=True)
     sponsor: Mapped["Sponsor"] = relationship("Sponsor", lazy="joined")
 
     # Timestamps
@@ -235,7 +236,7 @@ class LearningContent(Base):
         server_default=func.now(),
         onupdate=datetime.utcnow,
     )
-    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Transient attributes for resolved URLs (not DB columns)
     thumbnail_url: str | None = None
@@ -267,7 +268,7 @@ class ContentReview(Base):
     )
     reviewer_id: Mapped[str] = mapped_column(String(64), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
@@ -302,7 +303,7 @@ class LearningProgress(Base):
     last_accessed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=datetime.utcnow
     )
-    completed_at: Mapped[datetime | None] = mapped_column(
+    completed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -349,8 +350,8 @@ class LearningPath(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     slug: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    thumbnail_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     
     # Primary topic this path belongs to
     topic_id: Mapped[str] = mapped_column(String(36), ForeignKey("topics.id", ondelete="CASCADE"), nullable=False)
@@ -365,7 +366,7 @@ class LearningPath(Base):
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, server_default=func.now(), onupdate=datetime.utcnow)
-    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     modules: Mapped[list["LearningModule"]] = relationship(
         "LearningModule", back_populates="path", cascade="all, delete-orphan",
@@ -387,7 +388,7 @@ class LearningModule(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     path_id: Mapped[str] = mapped_column(String(36), ForeignKey("learning_paths.id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     display_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, server_default=func.now())
@@ -436,17 +437,17 @@ class ResearchSource(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    canonical_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    canonical_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     domain: Mapped[str] = mapped_column(String(255), nullable=False)
-    title: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    publisher: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    publisher: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     source_type: Mapped[str] = mapped_column(String(50), nullable=False, default="INTERNET")
     
     accessed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, server_default=func.now())
-    extracted_facts: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
-    content_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    related_content: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
-    raw_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extracted_facts: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    content_hash: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    related_content: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    raw_content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, server_default=func.now()

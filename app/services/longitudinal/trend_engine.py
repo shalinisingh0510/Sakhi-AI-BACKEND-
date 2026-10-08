@@ -1,4 +1,5 @@
 """Wellness Trend Engine to compute deterministic trends over time."""
+from __future__ import annotations
 
 from typing import Sequence
 from app.schemas.longitudinal import InsightConfidence, TrendDirection, WellnessTrend, TrackingCompleteness

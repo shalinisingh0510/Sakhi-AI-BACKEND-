@@ -1,4 +1,5 @@
 """Health Context Router to map user intent to required health context scopes."""
+from __future__ import annotations
 
 from typing import List
 from app.services.ai_context.context_builder import ContextScope

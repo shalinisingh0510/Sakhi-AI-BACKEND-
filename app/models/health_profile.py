@@ -1,3 +1,4 @@
+from __future__ import annotations
 """SQLAlchemy ORM models for the Health Profile domain.
 
 Tables:
@@ -12,11 +13,10 @@ Design notes:
     go through a deliberate data-purge workflow, not automatic cascade.
 """
 
-from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -47,9 +47,9 @@ class HealthProfile(Base):
 
     # Age & body
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
-    biological_sex: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    height_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
-    weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    biological_sex: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    height_cm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    weight_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # Lifestyle
     activity_level: Mapped[str] = mapped_column(
@@ -61,8 +61,8 @@ class HealthProfile(Base):
 
     # Multi-value dietary data stored as JSON arrays.
     # e.g. '["gluten", "dairy"]'
-    food_allergies_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    dietary_restrictions_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    food_allergies_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    dietary_restrictions_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Tracking preferences (default enabled, except AI which requires opt-in)
     cycle_tracking_enabled: Mapped[bool] = mapped_column(
@@ -147,7 +147,7 @@ class HealthCondition(Base):
     )
 
     # Free-text notes — NEVER logged
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     reported_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

@@ -5,7 +5,7 @@ These are daily observations, not medical diagnoses.
 from __future__ import annotations
 
 from datetime import date, datetime
-from enum import StrEnum
+from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # Enumerations
 # ---------------------------------------------------------------------------
 
-class SymptomCategory(StrEnum):
+class SymptomCategory(str, Enum):
     MENSTRUAL = "MENSTRUAL"
     PAIN = "PAIN"
     DIGESTIVE = "DIGESTIVE"
@@ -26,13 +26,13 @@ class SymptomCategory(StrEnum):
     MOOD_RELATED = "MOOD_RELATED"
     OTHER = "OTHER"
 
-class Severity(StrEnum):
+class Severity(str, Enum):
     NONE = "NONE"
     MILD = "MILD"
     MODERATE = "MODERATE"
     SEVERE = "SEVERE"
 
-class MoodCode(StrEnum):
+class MoodCode(str, Enum):
     HAPPY = "HAPPY"
     CALM = "CALM"
     NEUTRAL = "NEUTRAL"
@@ -44,12 +44,12 @@ class MoodCode(StrEnum):
     ENERGETIC = "ENERGETIC"
     OTHER = "OTHER"
 
-class MoodIntensity(StrEnum):
+class MoodIntensity(str, Enum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
 
-class EnergyLevel(StrEnum):
+class EnergyLevel(str, Enum):
     VERY_LOW = "VERY_LOW"
     LOW = "LOW"
     MEDIUM = "MEDIUM"

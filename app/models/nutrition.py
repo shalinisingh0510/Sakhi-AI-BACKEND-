@@ -1,3 +1,4 @@
+from __future__ import annotations
 """SQLAlchemy ORM models for the Nutrition & Food Tracking domain (Phase 5).
 
 Tables:
@@ -16,11 +17,10 @@ Design notes:
   * No AI, no calorie goals — purely deterministic data foundation.
 """
 
-from __future__ import annotations
 
 import json
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import (
     Boolean,
@@ -103,17 +103,17 @@ class Food(Base):
 
     # Identity
     name_en: Mapped[str] = mapped_column(String(200), nullable=False)
-    name_hi: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    name_regional: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    name_hi: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    name_regional: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
     # Classification
     category: Mapped[str] = mapped_column(String(50), nullable=False)
-    cuisine: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    cuisine: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     diet_type: Mapped[str] = mapped_column(String(30), nullable=False, default=DietType.VEGETARIAN)
 
     # Search aliases stored as JSON array: ["chapati", "phulka", "roti"]
     # Enables alias-aware search without duplicating food records
-    search_aliases_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    search_aliases_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Core nutrition per 100g (required)
     calories_per_100g: Mapped[float] = mapped_column(Float, nullable=False)
@@ -125,17 +125,17 @@ class Food(Base):
     sodium_mg: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     # Extended nutrition (nullable — added when reliable data exists)
-    iron_mg: Mapped[float | None] = mapped_column(Float, nullable=True)
-    calcium_mg: Mapped[float | None] = mapped_column(Float, nullable=True)
-    folate_mcg: Mapped[float | None] = mapped_column(Float, nullable=True)
-    vitamin_d_mcg: Mapped[float | None] = mapped_column(Float, nullable=True)
-    vitamin_b12_mcg: Mapped[float | None] = mapped_column(Float, nullable=True)
-    potassium_mg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    iron_mg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    calcium_mg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    folate_mcg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    vitamin_d_mcg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    vitamin_b12_mcg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    potassium_mg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # Data provenance — IMPORTANT: never claim verified status without a real source
     data_quality: Mapped[str] = mapped_column(String(30), nullable=False, default=DataQuality.ESTIMATED)
-    data_source: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    data_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    data_source: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    data_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Soft-delete instead of hard-delete to preserve log item integrity
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -287,7 +287,7 @@ class NutritionLogItem(Base):
     food_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("foods.id", ondelete="RESTRICT"), nullable=False
     )
-    serving_option_id: Mapped[str | None] = mapped_column(
+    serving_option_id: Mapped[Optional[str]] = mapped_column(
         String(36), ForeignKey("food_serving_options.id", ondelete="SET NULL"), nullable=True
     )
 

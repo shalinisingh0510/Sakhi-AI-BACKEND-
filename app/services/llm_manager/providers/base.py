@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Protocol, Optional, Type, TypeVar, Any
 from pydantic import BaseModel
 from app.services.llm_manager.models import LLMResponse, ProviderName

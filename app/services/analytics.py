@@ -26,7 +26,7 @@ class AnalyticsNotFoundError(AnalyticsError):
     pass
 
 
-@dataclass(slots=True)
+@dataclass()
 class StoredAnalyticsEvent:
     id: str
     user_id: str
