@@ -13,10 +13,18 @@ from app.services.feedback import StoredFeedback
 class PostgresFeedbackStore:
     def __init__(self, pool: ConnectionPool) -> None:
         self._pool = pool
-        self._initialize_schema()
+        try:
+
+            self._initialize_schema()
+
+        except Exception as e:
+
+            import logging
+
+            logging.getLogger(__name__).warning(f"Schema initialization failed: {e}")
 
     def _initialize_schema(self) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS feedback (
@@ -77,7 +85,7 @@ class PostgresFeedbackStore:
         feedback_id = uuid4().hex
         timestamp = datetime.now(timezone.utc).isoformat()
         try:
-            with self._pool.connection() as conn:
+            with self._pool.connection(timeout=2.0) as conn:
                 conn.execute(
                     """
                     INSERT INTO feedback (
@@ -97,7 +105,7 @@ class PostgresFeedbackStore:
         return feedback
 
     def get_feedback(self, feedback_id: str) -> StoredFeedback | None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute("SELECT * FROM feedback WHERE id = %s", (feedback_id,)).fetchone()
         return None if row is None else self._row_to_feedback(row)
@@ -135,7 +143,7 @@ class PostgresFeedbackStore:
         where_clause, params = self._build_filters(user_id=user_id, status=status, category=category)
         query = f"SELECT * FROM feedback{where_clause} ORDER BY created_at DESC LIMIT %s OFFSET %s"
         params.extend([limit, offset])
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(query, params).fetchall()
         return [self._row_to_feedback(row) for row in rows]
@@ -149,7 +157,7 @@ class PostgresFeedbackStore:
     ) -> int:
         where_clause, params = self._build_filters(user_id=user_id, status=status, category=category)
         query = f"SELECT COUNT(*) AS count FROM feedback{where_clause}"
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(query, params).fetchone()
         return int(row["count"])
@@ -173,7 +181,7 @@ class PostgresFeedbackStore:
             conditions.append("category = %s")
             params.append(category)
         query = "SELECT AVG(rating) AS average_rating FROM feedback WHERE " + " AND ".join(conditions)
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(query, params).fetchone()
         return None if row is None or row["average_rating"] is None else float(row["average_rating"])
@@ -194,7 +202,7 @@ class PostgresFeedbackStore:
         notes_value = existing.admin_notes if admin_notes is None else admin_notes.strip() or None
         updated_at = datetime.now(timezone.utc).isoformat()
 
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             cursor = conn.execute(
                 """
                 UPDATE feedback

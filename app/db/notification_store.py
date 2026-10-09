@@ -14,10 +14,18 @@ from app.services.notifications import NotificationNotFoundError, StoredNotifica
 class PostgresNotificationStore:
     def __init__(self, pool: ConnectionPool) -> None:
         self._pool = pool
-        self._initialize_schema()
+        try:
+
+            self._initialize_schema()
+
+        except Exception as e:
+
+            import logging
+
+            logging.getLogger(__name__).warning(f"Schema initialization failed: {e}")
 
     def _initialize_schema(self) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS notifications (
@@ -70,7 +78,7 @@ class PostgresNotificationStore:
         notification_id = uuid4().hex
         timestamp = datetime.now(timezone.utc).isoformat()
         try:
-            with self._pool.connection() as conn:
+            with self._pool.connection(timeout=2.0) as conn:
                 conn.execute(
                     """
                     INSERT INTO notifications (
@@ -102,13 +110,13 @@ class PostgresNotificationStore:
         if unread_only:
             query += " AND is_read = 0"
         query += " ORDER BY created_at DESC"
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(query, params).fetchall()
         return [self._row_to_notification(row) for row in rows]
 
     def count_unread(self, *, user_id: str) -> int:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
                     "SELECT COUNT(*) AS count FROM notifications WHERE user_id = %s AND is_read = 0",
@@ -117,7 +125,7 @@ class PostgresNotificationStore:
         return int(row["count"])
 
     def get_notification(self, *, notification_id: str, user_id: str) -> StoredNotification | None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
                     "SELECT * FROM notifications WHERE id = %s AND user_id = %s",
@@ -127,7 +135,7 @@ class PostgresNotificationStore:
 
     def mark_as_read(self, *, notification_id: str, user_id: str) -> StoredNotification:
         timestamp = datetime.now(timezone.utc).isoformat()
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             cursor = conn.execute(
                 """
                 UPDATE notifications
@@ -146,7 +154,7 @@ class PostgresNotificationStore:
 
     def mark_all_as_read(self, *, user_id: str) -> int:
         timestamp = datetime.now(timezone.utc).isoformat()
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             cursor = conn.execute(
                 "UPDATE notifications SET is_read = 1, read_at = %s WHERE user_id = %s AND is_read = 0",
                 (timestamp, user_id),
@@ -154,7 +162,7 @@ class PostgresNotificationStore:
         return cursor.rowcount
 
     def delete_notification(self, *, notification_id: str, user_id: str) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             cursor = conn.execute(
                 "DELETE FROM notifications WHERE id = %s AND user_id = %s",
                 (notification_id, user_id),

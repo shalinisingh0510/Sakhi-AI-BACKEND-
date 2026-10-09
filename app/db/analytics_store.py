@@ -14,10 +14,18 @@ from app.services.analytics import StoredAnalyticsEvent
 class PostgresAnalyticsStore:
     def __init__(self, pool: ConnectionPool) -> None:
         self._pool = pool
-        self._initialize_schema()
+        try:
+
+            self._initialize_schema()
+
+        except Exception as e:
+
+            import logging
+
+            logging.getLogger(__name__).warning(f"Schema initialization failed: {e}")
 
     def _initialize_schema(self) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS analytics_events (
@@ -57,7 +65,7 @@ class PostgresAnalyticsStore:
         event_id = uuid4().hex
         timestamp = datetime.now(timezone.utc).isoformat()
         try:
-            with self._pool.connection() as conn:
+            with self._pool.connection(timeout=2.0) as conn:
                 conn.execute(
                     """
                     INSERT INTO analytics_events (id, user_id, event_type, metadata_json, created_at)
@@ -80,7 +88,7 @@ class PostgresAnalyticsStore:
         return event
 
     def get_event(self, *, event_id: str) -> StoredAnalyticsEvent | None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
                     "SELECT * FROM analytics_events WHERE id = %s",
@@ -105,7 +113,7 @@ class PostgresAnalyticsStore:
         query += " ORDER BY created_at DESC LIMIT %s"
         params.append(limit)
 
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(query, params).fetchall()
         return [self._row_to_event(row) for row in rows]
@@ -118,13 +126,13 @@ class PostgresAnalyticsStore:
             query += " AND event_type = %s"
             params.append(event_type)
 
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(query, params).fetchone()
         return int(row["count"])
 
     def get_user_engagement_metrics(self, *, user_id: str) -> dict[str, int | datetime | None]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 total_events_row = cursor.execute(
                     "SELECT COUNT(*) AS count FROM analytics_events WHERE user_id = %s",
@@ -163,7 +171,7 @@ class PostgresAnalyticsStore:
         }
 
     def get_platform_overview(self) -> dict[str, int]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 total_users_row = cursor.execute(
                     "SELECT COUNT(*) AS count FROM users WHERE is_deleted = 0"
@@ -219,7 +227,7 @@ class PostgresAnalyticsStore:
         }
 
     def get_event_breakdown(self) -> list[dict[str, int | float]]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 total_events_row = cursor.execute("SELECT COUNT(*) AS count FROM analytics_events").fetchone()
                 total_events = int(total_events_row["count"])
@@ -247,7 +255,7 @@ class PostgresAnalyticsStore:
         return breakdown
 
     def get_daily_activity(self, days: int = 30) -> list[dict[str, int]]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 start_date = datetime.now(timezone.utc) - timedelta(days=days)
                 rows = cursor.execute(
@@ -275,7 +283,7 @@ class PostgresAnalyticsStore:
         return activity
 
     def get_top_users_by_engagement(self, limit: int = 10) -> list[dict[str, int]]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(
                     """
@@ -306,7 +314,7 @@ class PostgresAnalyticsStore:
         return top_users
 
     def get_rag_metrics(self) -> dict[str, float]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 # Count total rag_query events
                 total_queries_row = cursor.execute(

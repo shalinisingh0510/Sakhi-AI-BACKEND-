@@ -12,10 +12,18 @@ from app.services.ai import StoredConversation, StoredConversationMessage
 class PostgresConversationStore:
     def __init__(self, pool: ConnectionPool) -> None:
         self._pool = pool
-        self._initialize_schema()
+        try:
+
+            self._initialize_schema()
+
+        except Exception as e:
+
+            import logging
+
+            logging.getLogger(__name__).warning(f"Schema initialization failed: {e}")
 
     def _initialize_schema(self) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS conversations (
@@ -99,7 +107,7 @@ class PostgresConversationStore:
     ) -> StoredConversation:
         conversation_id = uuid4().hex
         timestamp = datetime.now(timezone.utc).isoformat()
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 INSERT INTO conversations (id, user_id, title, preferred_language, created_at, updated_at)
@@ -113,7 +121,7 @@ class PostgresConversationStore:
         return conversation
 
     def get_conversation(self, conversation_id: str) -> StoredConversation | None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
                     "SELECT id, user_id, title, preferred_language, created_at, updated_at FROM conversations WHERE id = %s",
@@ -128,7 +136,7 @@ class PostgresConversationStore:
         return self._row_to_conversation(row, int(message_count))
 
     def list_conversations(self, user_id: str) -> list[StoredConversation]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(
                     """
@@ -145,7 +153,7 @@ class PostgresConversationStore:
         return [self._row_to_conversation(row, int(row["message_count"])) for row in rows]
 
     def get_messages(self, conversation_id: str) -> list[StoredConversationMessage]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(
                     """
@@ -165,7 +173,7 @@ class PostgresConversationStore:
         import json
         citations_json = json.dumps(citations) if citations is not None else None
 
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 INSERT INTO conversation_messages (id, conversation_id, role, content, citations, created_at)
@@ -185,7 +193,7 @@ class PostgresConversationStore:
 
     def update_conversation_timestamp(self, conversation_id: str) -> None:
         timestamp = datetime.now(timezone.utc).isoformat()
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             cursor = conn.execute(
                 "UPDATE conversations SET updated_at = %s WHERE id = %s",
                 (timestamp, conversation_id),
