@@ -12,10 +12,18 @@ from app.services.progress import StoredLessonProgress
 class PostgresProgressStore:
     def __init__(self, pool: ConnectionPool) -> None:
         self._pool = pool
-        self._initialize_schema()
+        try:
+
+            self._initialize_schema()
+
+        except Exception as e:
+
+            import logging
+
+            logging.getLogger(__name__).warning(f"Schema initialization failed: {e}")
 
     def _initialize_schema(self) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS lesson_progress (
@@ -74,7 +82,7 @@ class PostgresProgressStore:
         timestamp = datetime.now(timezone.utc).isoformat()
         completed_at = timestamp if status == "completed" else None
 
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 INSERT INTO lesson_progress (
@@ -107,7 +115,7 @@ class PostgresProgressStore:
         return progress
 
     def get_progress(self, *, user_id: str, lesson_id: str) -> StoredLessonProgress | None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
                     """
@@ -120,7 +128,7 @@ class PostgresProgressStore:
         return None if row is None else self._row_to_progress(row)
 
     def list_progress(self, *, user_id: str) -> list[StoredLessonProgress]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(
                     """

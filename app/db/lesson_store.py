@@ -15,12 +15,16 @@ from app.services.lessons import DuplicateLessonSlugError, StoredLesson
 class PostgresLessonStore:
     def __init__(self, pool: ConnectionPool) -> None:
         self._pool = pool
-        self._initialize_schema()
-        self._seed_default_lessons()
-        self._rebuild_search_index()
+        try:
+            self._initialize_schema()
+            self._seed_default_lessons()
+            self._rebuild_search_index()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Schema initialization or seeding failed: {e}")
 
     def _initialize_schema(self) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS lessons (
@@ -61,7 +65,7 @@ class PostgresLessonStore:
         return lesson.search_text()
 
     def _sync_search_index(self, lesson: StoredLesson) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute("DELETE FROM lesson_search_index WHERE lesson_id = %s", (lesson.id,))
             conn.execute(
                 """
@@ -72,11 +76,11 @@ class PostgresLessonStore:
             )
 
     def _delete_search_index(self, lesson_id: str) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute("DELETE FROM lesson_search_index WHERE lesson_id = %s", (lesson_id,))
 
     def _rebuild_search_index(self) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute("DELETE FROM lesson_search_index")
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute("SELECT * FROM lessons WHERE is_deleted = 0").fetchall()
@@ -92,7 +96,7 @@ class PostgresLessonStore:
                 )
 
     def _seed_default_lessons(self) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 count = cursor.execute("SELECT COUNT(*) AS count FROM lessons").fetchone()["count"]
         if count:
@@ -217,7 +221,7 @@ class PostgresLessonStore:
         lesson_id = uuid4().hex
         timestamp = datetime.now(timezone.utc).isoformat()
         try:
-            with self._pool.connection() as conn:
+            with self._pool.connection(timeout=2.0) as conn:
                 conn.execute(
                     """
                     INSERT INTO lessons (
@@ -253,7 +257,7 @@ class PostgresLessonStore:
         return lesson
 
     def get_by_id(self, lesson_id: str) -> StoredLesson | None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
                     "SELECT * FROM lessons WHERE id = %s AND is_deleted = 0",
@@ -262,7 +266,7 @@ class PostgresLessonStore:
         return None if row is None else self._row_to_lesson(row)
 
     def get_by_slug(self, slug: str) -> StoredLesson | None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
                     "SELECT * FROM lessons WHERE slug = %s AND is_deleted = 0",
@@ -275,7 +279,7 @@ class PostgresLessonStore:
         if published_only is True:
             conditions.append("published = 1")
         query = f"SELECT * FROM lessons WHERE {' AND '.join(conditions)} ORDER BY updated_at DESC"
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(query).fetchall()
         return [self._row_to_lesson(row) for row in rows]
@@ -301,7 +305,7 @@ class PostgresLessonStore:
             WHERE {' AND '.join(conditions)}
             ORDER BY l.updated_at DESC
         """
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(query_sql, params).fetchall()
         return [self._row_to_lesson(row) for row in rows]
@@ -311,7 +315,7 @@ class PostgresLessonStore:
         if published_only:
             conditions.append("published = 1")
         query = f"SELECT category, COUNT(*) AS count FROM lessons WHERE {' AND '.join(conditions)} GROUP BY category ORDER BY category ASC"
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(query).fetchall()
         return [(row["category"], int(row["count"])) for row in rows]
@@ -377,7 +381,7 @@ class PostgresLessonStore:
         params.append(lesson_id)
 
         try:
-            with self._pool.connection() as conn:
+            with self._pool.connection(timeout=2.0) as conn:
                 cursor = conn.execute(
                     f"UPDATE lessons SET {', '.join(updates)} WHERE id = %s AND is_deleted = 0",
                     params,
@@ -397,7 +401,7 @@ class PostgresLessonStore:
     def delete_lesson(self, lesson_id: str) -> None:
         """Soft-delete: mark lesson as deleted rather than removing the row."""
         deleted_at = datetime.now(timezone.utc).isoformat()
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             cursor = conn.execute(
                 "UPDATE lessons SET is_deleted = 1, deleted_at = %s, published = 0 WHERE id = %s AND is_deleted = 0",
                 (deleted_at, lesson_id),

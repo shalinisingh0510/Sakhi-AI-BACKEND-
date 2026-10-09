@@ -14,10 +14,18 @@ from app.services.auth import DuplicateEmailError, InvalidCredentialsError, Stor
 class PostgresAuthStore:
     def __init__(self, pool: ConnectionPool) -> None:
         self._pool = pool
-        self._initialize_schema()
+        try:
+
+            self._initialize_schema()
+
+        except Exception as e:
+
+            import logging
+
+            logging.getLogger(__name__).warning(f"Schema initialization failed: {e}")
 
     def _initialize_schema(self) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS users (
@@ -69,7 +77,7 @@ class PostgresAuthStore:
         password_hash = hash_password(password)
 
         try:
-            with self._pool.connection() as conn:
+            with self._pool.connection(timeout=2.0) as conn:
                 conn.execute(
                     """
                     INSERT INTO users (id, name, email, password_hash, role, preferred_language, created_at, deleted_email)
@@ -95,7 +103,7 @@ class PostgresAuthStore:
         return user
 
     def get_by_email(self, email: str) -> StoredUser | None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
                     "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE email = %s AND is_deleted = 0",
@@ -104,7 +112,7 @@ class PostgresAuthStore:
         return None if row is None else self._row_to_user(row)
 
     def get_by_id(self, user_id: str) -> StoredUser | None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
                     "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE id = %s AND is_deleted = 0",
@@ -149,7 +157,7 @@ class PostgresAuthStore:
             return user
 
         params.append(user_id)
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             cursor = conn.execute(
                 f"UPDATE users SET {', '.join(updates)} WHERE id = %s",
                 params,
@@ -164,7 +172,7 @@ class PostgresAuthStore:
 
     def update_user_role(self, *, user_id: str, role: str) -> StoredUser:
         normalized_role = role.strip().lower()
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             cursor = conn.execute(
                 "UPDATE users SET role = %s WHERE id = %s",
                 (normalized_role, user_id),
@@ -184,7 +192,7 @@ class PostgresAuthStore:
         if not verify_password(current_password, user.password_hash):
             raise InvalidCredentialsError("Current password is incorrect.")
         new_hash = hash_password(new_password)
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             cursor = conn.execute(
                 "UPDATE users SET password_hash = %s WHERE id = %s",
                 (new_hash, user_id),
@@ -193,7 +201,7 @@ class PostgresAuthStore:
             raise UserNotFoundError("User not found.")
 
     def list_users(self) -> list[StoredUser]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(
                     "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE is_deleted = 0 ORDER BY created_at ASC"
@@ -213,7 +221,7 @@ class PostgresAuthStore:
         sql = "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users"
         sql += " WHERE " + " AND ".join(conditions)
         sql += " ORDER BY created_at ASC"
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(sql, params).fetchall()
         return [self._row_to_user(row) for row in rows]
@@ -222,7 +230,7 @@ class PostgresAuthStore:
         """Soft-delete: mark the user as deleted rather than removing the row."""
         deleted_at = datetime.now(timezone.utc).isoformat()
         tombstone_email = f"deleted-{user_id}@deleted.local"
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             cursor = conn.execute(
                 "UPDATE users SET is_deleted = 1, deleted_at = %s, deleted_email = email, email = %s WHERE id = %s AND is_deleted = 0",
                 (deleted_at, tombstone_email, user_id),

@@ -16,10 +16,18 @@ logger = logging.getLogger(__name__)
 class PostgresMediaStore:
     def __init__(self, pool: ConnectionPool) -> None:
         self._pool = pool
-        self._initialize_schema()
+        try:
+
+            self._initialize_schema()
+
+        except Exception as e:
+
+            import logging
+
+            logging.getLogger(__name__).warning(f"Schema initialization failed: {e}")
 
     def _initialize_schema(self) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS media_files (
@@ -63,7 +71,7 @@ class PostgresMediaStore:
         media_id = uuid4().hex
         timestamp = datetime.now(timezone.utc).isoformat()
         try:
-            with self._pool.connection() as conn:
+            with self._pool.connection(timeout=2.0) as conn:
                 conn.execute(
                     """
                     INSERT INTO media_files (id, uploader_id, filename, content_type, size_bytes, storage_key, created_at)
@@ -80,7 +88,7 @@ class PostgresMediaStore:
         return record
 
     def get_media_record(self, media_id: str) -> StoredMedia | None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
                     "SELECT * FROM media_files WHERE id = %s",
@@ -89,7 +97,7 @@ class PostgresMediaStore:
         return None if row is None else self._row_to_media(row)
 
     def list_user_media(self, uploader_id: str) -> list[StoredMedia]:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 rows = cursor.execute(
                     "SELECT * FROM media_files WHERE uploader_id = %s ORDER BY created_at DESC",
@@ -98,7 +106,7 @@ class PostgresMediaStore:
         return [self._row_to_media(row) for row in rows]
 
     def delete_media_record(self, media_id: str) -> None:
-        with self._pool.connection() as conn:
+        with self._pool.connection(timeout=2.0) as conn:
             conn.execute(
                 "DELETE FROM media_files WHERE id = %s",
                 (media_id,),
