@@ -46,41 +46,70 @@ class TopicNotFoundError(ValueError):
 
 from app.services.storage import StorageServiceProtocol
 
+CATEGORY_FALLBACK_THUMBNAILS = {
+    "periods": "https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80",
+    "menstrual health": "https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80",
+    "pcos": "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=800&q=80",
+    "pregnancy": "https://images.unsplash.com/photo-1555252333-9f8e92e65df9?auto=format&fit=crop&w=800&q=80",
+    "nutrition": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=800&q=80",
+    "mental-wellbeing": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80",
+    "mental health": "https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=800&q=80",
+    "reproductive-health": "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80",
+    "reproductive health": "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80",
+    "fitness": "https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=800&q=80",
+    "puberty": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=800&q=80",
+    "health": "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=800&q=80",
+}
+DEFAULT_THUMBNAIL = "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=800&q=80"
+
+
 class LearningService:
     def __init__(self, db: Session, storage_service: Optional[StorageServiceProtocol] = None) -> None:
         self._db = db
         self._storage_service = storage_service
 
     def _resolve_urls(self, content: LearningContent) -> LearningContent:
-        """Inject resolved presigned URLs if a storage service is available."""
-        if not self._storage_service:
-            return content
+        """Inject resolved URLs for thumbnails and media files."""
+        # 1. YouTube thumbnail auto-extraction
+        if content.source_type == "YOUTUBE" and content.media_url and not content.thumbnail_url:
+            vid_id = extract_youtube_id(content.media_url)
+            if vid_id:
+                content.thumbnail_url = f"https://img.youtube.com/vi/{vid_id}/hqdefault.jpg"
 
-        if content.thumbnail_file_id:
-            try:
-                content.thumbnail_url = self._storage_service.generate_presigned_download_url(
-                    content.thumbnail_file_id
-                )
-            except Exception:
-                pass  # Silently fail if storage is down
+        # 2. Presigned URLs from storage service if available
+        if self._storage_service:
+            if content.thumbnail_file_id:
+                try:
+                    resolved = self._storage_service.generate_presigned_download_url(
+                        content.thumbnail_file_id
+                    )
+                    if resolved:
+                        content.thumbnail_url = resolved
+                except Exception:
+                    pass  # Silently fail if storage is down
 
-        if content.media_file_id:
-            try:
-                content.media_file_url = self._storage_service.generate_presigned_download_url(
-                    content.media_file_id
-                )
-            except Exception:
-                pass
+            if content.media_file_id:
+                try:
+                    content.media_file_url = self._storage_service.generate_presigned_download_url(
+                        content.media_file_id
+                    )
+                except Exception:
+                    pass
 
-        if content.body and isinstance(content.body, list):
-            for block in content.body:
-                if isinstance(block, dict) and block.get("media_file_id"):
-                    try:
-                        block["url"] = self._storage_service.generate_presigned_download_url(
-                            block["media_file_id"]
-                        )
-                    except Exception:
-                        pass
+            if content.body and isinstance(content.body, list):
+                for block in content.body:
+                    if isinstance(block, dict) and block.get("media_file_id"):
+                        try:
+                            block["url"] = self._storage_service.generate_presigned_download_url(
+                                block["media_file_id"]
+                            )
+                        except Exception:
+                            pass
+
+        # 3. Fallback thumbnail if still missing
+        if not content.thumbnail_url:
+            cat_key = (content.category or "").strip().lower()
+            content.thumbnail_url = CATEGORY_FALLBACK_THUMBNAILS.get(cat_key, DEFAULT_THUMBNAIL)
 
         return content
 

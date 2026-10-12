@@ -24,7 +24,16 @@ class ContentIngestionService:
         self.db = db
         self.llm_manager = llm_manager
 
-    def ingest_article(self, topic_slug: str, article_title: str, languages: List[str] = ["en", "hi", "mr"], publish: bool = False, dry_run: bool = False) -> Dict[str, Any]:
+    def ingest_article(
+        self,
+        topic_slug: str,
+        article_title: str,
+        languages: List[str] = ["en", "hi", "mr"],
+        publish: bool = False,
+        dry_run: bool = False,
+        subtopic_slug: Optional[str] = None,
+        thumbnail_url: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Runs the content ingestion pipeline."""
         logger.info(f"Starting ingestion pipeline for topic: {topic_slug}, title: {article_title}")
         
@@ -35,7 +44,15 @@ class ContentIngestionService:
             topic = self.db.scalar(select(Topic).where(Topic.slug == topic_slug))
             if not topic:
                 raise ValueError(f"Topic not found: {topic_slug}")
-            subtopic = self.db.scalar(select(Subtopic).where(Subtopic.topic_id == topic.id).limit(1))
+            if subtopic_slug:
+                subtopic = self.db.scalar(
+                    select(Subtopic).where(
+                        Subtopic.topic_id == topic.id,
+                        Subtopic.slug == subtopic_slug
+                    )
+                )
+            if not subtopic:
+                subtopic = self.db.scalar(select(Subtopic).where(Subtopic.topic_id == topic.id).limit(1))
         
         # Check idempotency
         if not dry_run and "en" in languages:
@@ -108,7 +125,8 @@ class ContentIngestionService:
                 status=target_status,
                 translation_group_id=translation_group_id,
                 topic_id=topic.id if topic else "test-topic",
-                subtopic_id=subtopic.id if subtopic else "test-subtopic"
+                subtopic_id=subtopic.id if subtopic else "test-subtopic",
+                thumbnail_url=thumbnail_url,
             )
             self.db.add(eng_record)
             self.db.commit()
@@ -172,7 +190,8 @@ class ContentIngestionService:
                     status=lang_status,
                     translation_group_id=translation_group_id,
                     topic_id=topic.id if topic else "test-topic",
-                    subtopic_id=subtopic.id if subtopic else "test-subtopic"
+                    subtopic_id=subtopic.id if subtopic else "test-subtopic",
+                    thumbnail_url=thumbnail_url,
                 )
                 self.db.add(lang_record)
                 self.db.commit()
@@ -197,7 +216,8 @@ class ContentIngestionService:
         status: str, 
         translation_group_id: str,
         topic_id: str,
-        subtopic_id: str
+        subtopic_id: str,
+        thumbnail_url: Optional[str] = None,
     ) -> LearningContent:
         body_data = article.model_dump()
         # Remove title and description from body since they are columns
@@ -219,6 +239,7 @@ class ContentIngestionService:
             author_id="SYSTEM-AI-INGESTION-1234",
             topic_id=topic_id,
             subtopic_id=subtopic_id,
+            thumbnail_url=thumbnail_url,
             is_featured=False,
             is_short_form=False
         )

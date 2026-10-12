@@ -174,6 +174,9 @@ class LearningContent(Base):
     # Thumbnail: also references media_files.id
     thumbnail_file_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 
+    # Direct/Resolved thumbnail URL (Unsplash, external CDN, or presigned)
+    thumbnail_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
     # Structured JSON body for ARTICLE / POST / TUTORIAL content blocks
     body: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
@@ -239,7 +242,6 @@ class LearningContent(Base):
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Transient attributes for resolved URLs (not DB columns)
-    thumbnail_url: str | None = None
     media_file_url: str | None = None
 
     __table_args__ = (

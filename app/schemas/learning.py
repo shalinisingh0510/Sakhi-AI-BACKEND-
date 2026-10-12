@@ -166,8 +166,9 @@ class LearningContentBase(BaseModel):
     media_url: Optional[str] = Field(None, max_length=500)
     # For PRIVATE_VIDEO: media_files.id from the existing R2/psycopg system
     media_file_id: Optional[str] = None
-    # Thumbnail: media_files.id
+    # Thumbnail: media_files.id or direct image URL
     thumbnail_file_id: Optional[str] = None
+    thumbnail_url: Optional[str] = Field(None, max_length=500)
 
     # Article/Post/Tutorial body — typed list of blocks or structured AI dict
     body: Optional[Any] = None
@@ -239,6 +240,7 @@ class LearningContentUpdate(BaseModel):
     media_url: Optional[str] = Field(None, max_length=500)
     media_file_id: Optional[str] = None
     thumbnail_file_id: Optional[str] = None
+    thumbnail_url: Optional[str] = Field(None, max_length=500)
     body: Optional[Any] = None
     category: Optional[str] = Field(None, max_length=50)
     tags: Optional[List[str]] = None
