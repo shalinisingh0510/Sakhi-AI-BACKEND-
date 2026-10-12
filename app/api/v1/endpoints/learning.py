@@ -30,7 +30,12 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user, pagination_params, require_roles
+from app.api.dependencies import (
+    get_current_user,
+    get_current_user_optional,
+    pagination_params,
+    require_roles,
+)
 from app.db.dependencies import get_db
 from app.schemas.learning import (
     LearningContentCreate,
@@ -69,20 +74,21 @@ def get_learning_recommendation_service(
     return LearningRecommendationService(db, learning_service)
 
 def get_learning_context(
-    current_user: StoredUser = Depends(get_current_user),
+    current_user: StoredUser | None = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ) -> dict:
     lang_map = {"english": "en", "hindi": "hi", "marathi": "mr"}
-    user_lang = lang_map.get((current_user.preferred_language or "").lower(), "en")
+    user_lang = lang_map.get((current_user.preferred_language or "").lower(), "en") if current_user else "en"
 
     user_audience = "ADULT"
-    profile = db.scalar(select(HealthProfile).where(HealthProfile.user_id == current_user.id))
-    if profile and profile.date_of_birth:
-        today = date.today()
-        dob = profile.date_of_birth
-        age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
-        if age < 18:
-            user_audience = "TEEN"
+    if current_user:
+        profile = db.scalar(select(HealthProfile).where(HealthProfile.user_id == current_user.id))
+        if profile and profile.date_of_birth:
+            today = date.today()
+            dob = profile.date_of_birth
+            age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            if age < 18:
+                user_audience = "TEEN"
         
     return {"language": user_lang, "audience": user_audience}
 
@@ -98,7 +104,7 @@ def get_learning_context(
     summary="List all active topics with subtopics",
 )
 def get_topics(
-    current_user: StoredUser = Depends(get_current_user),
+    current_user: StoredUser | None = Depends(get_current_user_optional),
     service: LearningService = Depends(get_learning_service),
 ) -> Any:
     topics = service.get_topics(active_only=True)
@@ -112,7 +118,7 @@ def get_topics(
 )
 def get_topic(
     slug: str,
-    current_user: StoredUser = Depends(get_current_user),
+    current_user: StoredUser | None = Depends(get_current_user_optional),
     service: LearningService = Depends(get_learning_service),
 ) -> Any:
     try:
@@ -133,7 +139,7 @@ def get_topic_content(
     language: Optional[str] = Query(None),
     audience: Optional[str] = Query(None),
     pagination: tuple[int, int] = Depends(pagination_params),
-    current_user: StoredUser = Depends(get_current_user),
+    current_user: StoredUser | None = Depends(get_current_user_optional),
     service: LearningService = Depends(get_learning_service),
     ctx: dict = Depends(get_learning_context),
 ) -> Any:
@@ -191,7 +197,7 @@ def get_learning_feed(
     audience: Optional[str] = Query(None),
     is_short_form: Optional[bool] = Query(None),
     pagination: tuple[int, int] = Depends(pagination_params),
-    current_user: StoredUser = Depends(get_current_user),
+    current_user: StoredUser | None = Depends(get_current_user_optional),
     service: LearningService = Depends(get_learning_service),
     ctx: dict = Depends(get_learning_context),
 ) -> Any:
@@ -407,7 +413,7 @@ def toggle_bookmark(
 )
 def get_learning_item(
     id: str,
-    current_user: StoredUser = Depends(get_current_user),
+    current_user: StoredUser | None = Depends(get_current_user_optional),
     service: LearningService = Depends(get_learning_service),
     ctx: dict = Depends(get_learning_context),
 ) -> Any:
