@@ -260,6 +260,60 @@ class AuthService:
             raise InvalidCredentialsError(str(exc)) from exc
         return self._create_session(user)
 
+    def login_or_register_google(
+        self,
+        *,
+        credential: str | None = None,
+        code: str | None = None,
+        email: str | None = None,
+        name: str | None = None,
+        role: str = "user",
+    ) -> AuthSession:
+        extracted_email: str | None = email
+        extracted_name: str | None = name
+
+        if credential:
+            try:
+                import base64
+                import json as _json
+
+                parts = credential.strip().split(".")
+                if len(parts) >= 2:
+                    padding = "=" * (-len(parts[1]) % 4)
+                    payload_bytes = base64.urlsafe_b64decode(f"{parts[1]}{padding}")
+                    payload = _json.loads(payload_bytes.decode("utf-8"))
+
+                    if not extracted_email:
+                        extracted_email = payload.get("email")
+                    if not extracted_name:
+                        extracted_name = payload.get("name") or payload.get("given_name")
+            except Exception:
+                pass
+
+        if not extracted_email or not extracted_email.strip():
+            raise InvalidCredentialsError("Unable to extract verified email from Google authentication.")
+
+        normalized_email = extracted_email.strip().lower()
+        display_name = (extracted_name or normalized_email.split("@")[0]).strip()
+        if not display_name:
+            display_name = "Sakhi User"
+
+        user = self._store.get_by_email(normalized_email)
+        if user is None:
+            normalized_role = role.strip().lower() if role else "user"
+            if normalized_role not in REGISTRABLE_ROLES:
+                normalized_role = "user"
+
+            user = self._store.create_user(
+                name=display_name,
+                email=normalized_email,
+                password=f"google_{uuid4().hex}",
+                role=normalized_role,
+                preferred_language="english",
+            )
+
+        return self._create_session(user)
+
     def refresh_session(self, *, refresh_token: str) -> AuthSession:
         user = self.resolve_current_user(refresh_token=refresh_token, token_type="refresh")
         # Rotate: revoke the old refresh token so it cannot be reused

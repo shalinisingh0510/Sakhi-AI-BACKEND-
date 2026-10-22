@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
@@ -6,6 +6,7 @@ from app.api.dependencies import get_auth_service, get_current_user
 from app.schemas.auth import (
     AuthResponse,
     ChangePasswordRequest,
+    GoogleAuthRequest,
     LoginRequest,
     PublicUser,
     RefreshRequest,
@@ -13,6 +14,7 @@ from app.schemas.auth import (
     UpdateProfileRequest,
 )
 from app.services.auth import (
+    AuthError,
     AuthService,
     DuplicateEmailError,
     InvalidCredentialsError,
@@ -66,6 +68,25 @@ def login(
         session = auth_service.login_user(email=payload.email, password=payload.password)
     except InvalidCredentialsError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+
+    return _session_to_response(session)
+
+
+@router.post("/google", response_model=AuthResponse)
+def google_auth(
+    payload: GoogleAuthRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> AuthResponse:
+    try:
+        session = auth_service.login_or_register_google(
+            credential=payload.credential,
+            code=payload.code,
+            email=payload.email,
+            name=payload.name,
+            role=payload.role,
+        )
+    except AuthError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     return _session_to_response(session)
 

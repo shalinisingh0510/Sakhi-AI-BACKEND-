@@ -2,7 +2,11 @@ from __future__ import annotations
 import os
 from typing import Protocol, List
 from pydantic import BaseModel
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
+
 from PIL import Image
 import io
 
@@ -23,6 +27,8 @@ class GeminiVisionProvider:
     Implementation using Gemini Pro Vision (or gemini-1.5-flash/pro).
     """
     def __init__(self, api_key: str = None, model_name: str = "gemini-1.5-flash"):
+        if genai is None:
+            raise ImportError("google-generativeai is not installed.")
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY is not set.")

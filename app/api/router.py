@@ -31,8 +31,10 @@ from app.api.v1.endpoints.admin_rag import router as admin_rag_router
 from app.api.v1.endpoints.learning import router as learning_router
 from app.api.v1.endpoints.monetization import router as monetization_router
 from app.api.v1.endpoints.voice import router as voice_router
+from app.api.v1.endpoints.calculators import router as calculators_router
 
 api_router = APIRouter()
+api_router.include_router(calculators_router, prefix="/api/v1")
 api_router.include_router(nutrition_router, prefix="/api/v1")
 api_router.include_router(activity_router, prefix="/api/v1")
 api_router.include_router(energy_router, prefix="/api/v1")

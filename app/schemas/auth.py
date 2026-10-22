@@ -144,3 +144,12 @@ class AuthResponse(BaseModel):
     token_type: Literal["bearer"] = "bearer"
     expires_in_seconds: int
     refresh_expires_in_seconds: int
+
+
+class GoogleAuthRequest(BaseModel):
+    credential: str | None = None
+    code: str | None = None
+    email: str | None = None
+    name: str | None = None
+    picture: str | None = None
+    role: Literal["user", "admin"] = "user"
