@@ -25,7 +25,7 @@ class PostgresAuthStore:
             logging.getLogger(__name__).warning(f"Schema initialization failed: {e}")
 
     def _initialize_schema(self) -> None:
-        with self._pool.connection(timeout=2.0) as conn:
+        with self._pool.connection(timeout=10.0) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS users (
