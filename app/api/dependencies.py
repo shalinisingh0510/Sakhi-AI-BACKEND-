@@ -8,6 +8,7 @@ from app.services.chat import ChatService
 from app.services.feedback import FeedbackService
 from app.services.lessons import LessonService
 from app.services.notifications import NotificationService
+from app.services.notification_engine import NotificationEngineService
 from app.services.progress import ProgressService
 from app.services.recommendations import RecommendationService
 from app.db.dependencies import get_db
@@ -31,6 +32,10 @@ def get_lesson_service(request: Request) -> LessonService:
 
 def get_notification_service(request: Request) -> NotificationService:
     return request.app.state.notification_service
+
+
+def get_notification_engine(request: Request) -> NotificationEngineService:
+    return request.app.state.notification_engine
 
 
 def get_feedback_service(request: Request) -> FeedbackService:

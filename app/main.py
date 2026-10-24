@@ -43,6 +43,7 @@ from app.services.feedback import FeedbackService
 from app.services.lessons import LessonService
 from app.services.media import MediaService
 from app.services.notifications import NotificationService
+from app.services.notification_engine import NotificationEngineService
 from app.services.progress import ProgressService
 from app.services.recommendations import RecommendationService
 from app.services.storage import CloudflareStorageService
@@ -138,6 +139,10 @@ def create_app(
             store=app.state.notification_store,
             auth_store=app.state.auth_store,
             email_service=app.state.email_service,
+        )
+        app.state.notification_engine = NotificationEngineService(
+            notification_service=app.state.notification_service,
+            auth_store=app.state.auth_store,
         )
         app.state.progress_store = PostgresProgressStore(db_pool)
         app.state.progress_service = ProgressService(

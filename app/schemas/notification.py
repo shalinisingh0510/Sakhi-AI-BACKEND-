@@ -5,7 +5,18 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-NotificationType = Literal["announcement", "lesson_completed", "reminder", "system"]
+NotificationType = Literal[
+    "announcement",
+    "lesson_completed",
+    "reminder",
+    "system",
+    "cycle_alert",
+    "ovulation_alert",
+    "energy_insight",
+    "activity_checkin",
+    "module_published",
+    "learning_tip",
+]
 
 
 class NotificationItem(BaseModel):
@@ -29,6 +40,27 @@ class UnreadCountResponse(BaseModel):
 class NotificationDispatchResult(BaseModel):
     created_count: int
     notifications: list[NotificationItem]
+
+
+class EngineTickRequest(BaseModel):
+    topic: str | None = Field(default=None, description="Optional forced topic: period_cycle, ovulation, energy, activity, learning")
+    force: bool = Field(default=False, description="Bypass 2-hour cooldown")
+
+
+class EngineTickResponse(BaseModel):
+    triggered: bool
+    reason: str
+    next_topic: str
+    next_trigger_in_seconds: int = 0
+    notification: NotificationItem | None = None
+    interval_hours: int = 2
+
+
+class PublishModuleNotificationRequest(BaseModel):
+    module_title: str = Field(min_length=2, max_length=200)
+    module_id: str = Field(min_length=1, max_length=100)
+    category: str = Field(default="Puberty & Reproductive Health", max_length=100)
+    summary: str | None = Field(default=None, max_length=500)
 
 
 class CreateNotificationRequest(BaseModel):
@@ -58,7 +90,19 @@ class CreateNotificationRequest(BaseModel):
     @classmethod
     def normalize_notification_type(cls, value: str) -> str:
         normalized = value.strip().lower()
-        if normalized not in {"announcement", "lesson_completed", "reminder", "system"}:
+        allowed = {
+            "announcement",
+            "lesson_completed",
+            "reminder",
+            "system",
+            "cycle_alert",
+            "ovulation_alert",
+            "energy_insight",
+            "activity_checkin",
+            "module_published",
+            "learning_tip",
+        }
+        if normalized not in allowed:
             raise ValueError("Unsupported notification type.")
         return normalized
 
