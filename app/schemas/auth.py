@@ -29,6 +29,8 @@ class PublicUser(BaseModel):
     email: str
     role: str
     preferred_language: str = "english"
+    is_anonymous: bool = False
+    recovery_key: str | None = None
     created_at: datetime
 
 
@@ -153,3 +155,49 @@ class GoogleAuthRequest(BaseModel):
     name: str | None = None
     picture: str | None = None
     role: Literal["user", "admin"] = "user"
+
+
+class AnonymousAuthRequest(BaseModel):
+    preferred_language: str = "english"
+
+
+class AnonymousRestoreRequest(BaseModel):
+    recovery_key: str = Field(min_length=8, max_length=64)
+
+    @field_validator("recovery_key")
+    @classmethod
+    def normalize_recovery_key(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if len(normalized) < 8:
+            raise ValueError("Invalid recovery key format.")
+        return normalized
+
+
+class AnonymousConvertRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=254)
+    password: str = Field(min_length=8, max_length=128)
+    name: str = Field(min_length=2, max_length=100)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not EMAIL_PATTERN.match(normalized):
+            raise ValueError("Enter a valid email address.")
+        return normalized
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        return normalized
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Name is required.")
+        return normalized

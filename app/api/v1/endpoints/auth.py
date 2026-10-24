@@ -4,6 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.dependencies import get_auth_service, get_current_user
 from app.schemas.auth import (
+    AnonymousAuthRequest,
+    AnonymousConvertRequest,
+    AnonymousRestoreRequest,
     AuthResponse,
     ChangePasswordRequest,
     GoogleAuthRequest,
@@ -100,6 +103,69 @@ def refresh(
         session = auth_service.refresh_session(refresh_token=payload.refresh_token)
     except InvalidTokenError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+
+    return _session_to_response(session)
+
+
+@router.post("/anonymous", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+def create_anonymous_session(
+    payload: AnonymousAuthRequest = AnonymousAuthRequest(),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> AuthResponse:
+    """
+    Flo Health-inspired Anonymous Mode.
+    Creates a private session decoupled from user identity with zero personal identifiers.
+    Returns standard access & refresh JWT tokens and a private recovery key.
+    """
+    session = auth_service.create_anonymous_session(
+        preferred_language=payload.preferred_language,
+    )
+    return _session_to_response(session)
+
+
+@router.post("/anonymous/restore", response_model=AuthResponse)
+def restore_anonymous_session(
+    payload: AnonymousRestoreRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> AuthResponse:
+    """
+    Restore an existing anonymous health session on any device using the private recovery key.
+    """
+    try:
+        session = auth_service.restore_anonymous_session(recovery_key=payload.recovery_key)
+    except InvalidCredentialsError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+
+    return _session_to_response(session)
+
+
+@router.post("/anonymous/convert", response_model=AuthResponse)
+def convert_anonymous_session(
+    payload: AnonymousConvertRequest,
+    current_user: StoredUser = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> AuthResponse:
+    """
+    Convert an active anonymous tracking session into a permanent email account,
+    retaining all logged menstrual cycles, symptoms, and health plans.
+    """
+    if not current_user.is_anonymous:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The active account is already registered and cannot be converted.",
+        )
+
+    try:
+        session = auth_service.convert_anonymous_session(
+            user_id=current_user.id,
+            email=payload.email,
+            password=payload.password,
+            name=payload.name,
+        )
+    except DuplicateEmailError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except (AuthError, ValueError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     return _session_to_response(session)
 

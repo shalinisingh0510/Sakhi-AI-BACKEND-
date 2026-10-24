@@ -54,6 +54,8 @@ class StoredUser:
     role: str
     created_at: datetime
     preferred_language: str = DEFAULT_PREFERRED_LANGUAGE
+    is_anonymous: bool = False
+    recovery_key: str | None = None
 
     def to_public_user(self) -> PublicUser:
         return PublicUser.model_validate(self)
@@ -68,6 +70,8 @@ class AuthStoreProtocol(Protocol):
         password: str,
         role: str,
         preferred_language: str = DEFAULT_PREFERRED_LANGUAGE,
+        is_anonymous: bool = False,
+        recovery_key: str | None = None,
     ) -> StoredUser:
         ...
 
@@ -75,6 +79,19 @@ class AuthStoreProtocol(Protocol):
         ...
 
     def get_by_id(self, user_id: str) -> StoredUser | None:
+        ...
+
+    def get_by_recovery_key(self, recovery_key: str) -> StoredUser | None:
+        ...
+
+    def convert_anonymous_user(
+        self,
+        *,
+        user_id: str,
+        name: str,
+        email: str,
+        password: str,
+    ) -> StoredUser:
         ...
 
     def authenticate(self, *, email: str, password: str) -> StoredUser:
@@ -120,6 +137,7 @@ class InMemoryAuthStore:
         self._lock = RLock()
         self._users_by_id: dict[str, StoredUser] = {}
         self._users_by_email: dict[str, StoredUser] = {}
+        self._users_by_recovery_key: dict[str, StoredUser] = {}
 
     def create_user(
         self,
@@ -129,6 +147,8 @@ class InMemoryAuthStore:
         password: str,
         role: str,
         preferred_language: str = DEFAULT_PREFERRED_LANGUAGE,
+        is_anonymous: bool = False,
+        recovery_key: str | None = None,
     ) -> StoredUser:
         normalized_email = email.strip().lower()
         normalized_role = role.strip().lower()
@@ -146,9 +166,13 @@ class InMemoryAuthStore:
                 role=normalized_role,
                 created_at=datetime.now(timezone.utc),
                 preferred_language=normalized_language,
+                is_anonymous=is_anonymous,
+                recovery_key=recovery_key.strip().upper() if recovery_key else None,
             )
             self._users_by_id[user.id] = user
             self._users_by_email[normalized_email] = user
+            if user.recovery_key:
+                self._users_by_recovery_key[user.recovery_key] = user
             return user
 
     def get_by_email(self, email: str) -> StoredUser | None:
@@ -156,6 +180,40 @@ class InMemoryAuthStore:
 
     def get_by_id(self, user_id: str) -> StoredUser | None:
         return self._users_by_id.get(user_id)
+
+    def get_by_recovery_key(self, recovery_key: str) -> StoredUser | None:
+        return self._users_by_recovery_key.get(recovery_key.strip().upper())
+
+    def convert_anonymous_user(
+        self,
+        *,
+        user_id: str,
+        name: str,
+        email: str,
+        password: str,
+    ) -> StoredUser:
+        normalized_email = email.strip().lower()
+        with self._lock:
+            user = self._users_by_id.get(user_id)
+            if user is None:
+                raise UserNotFoundError("User not found.")
+            if normalized_email != user.email and normalized_email in self._users_by_email:
+                raise DuplicateEmailError("An account already exists for this email.")
+
+            old_email = user.email
+            old_recovery = user.recovery_key
+
+            user.name = name.strip()
+            user.email = normalized_email
+            user.password_hash = hash_password(password)
+            user.is_anonymous = False
+
+            if old_email in self._users_by_email:
+                del self._users_by_email[old_email]
+            self._users_by_email[normalized_email] = user
+            if old_recovery and old_recovery in self._users_by_recovery_key:
+                del self._users_by_recovery_key[old_recovery]
+            return user
 
     def authenticate(self, *, email: str, password: str) -> StoredUser:
         user = self.get_by_email(email)
@@ -228,6 +286,8 @@ class InMemoryAuthStore:
             if user is None:
                 raise UserNotFoundError("User not found.")
             self._users_by_email.pop(user.email, None)
+            if user.recovery_key:
+                self._users_by_recovery_key.pop(user.recovery_key, None)
 
 
 class AuthService:
@@ -259,6 +319,71 @@ class AuthService:
         except (InvalidCredentialsError, ValueError) as exc:
             raise InvalidCredentialsError(str(exc)) from exc
         return self._create_session(user)
+
+    def create_anonymous_session(self, *, preferred_language: str = "english") -> AuthSession:
+        """
+        Flo Health-inspired Anonymous Mode:
+        Creates a private decoupled session with zero personal identifiers.
+        Generates a secure recovery key so the user can backup/restore health data
+        without linking an email or social account.
+        """
+        import secrets
+
+        raw_token = secrets.token_hex(8).upper()
+        chunks = [raw_token[i : i + 4] for i in range(0, len(raw_token), 4)]
+        recovery_key = f"SAKHI-ANON-{'-'.join(chunks)}"
+
+        anon_id = uuid4().hex[:12]
+        anon_email = f"anon_{anon_id}@anonymous.sakhi.ai"
+        anon_name = "Anonymous Sakhi"
+        anon_password = secrets.token_urlsafe(32)
+
+        user = self._store.create_user(
+            name=anon_name,
+            email=anon_email,
+            password=anon_password,
+            role="user",
+            preferred_language=preferred_language,
+            is_anonymous=True,
+            recovery_key=recovery_key,
+        )
+        return self._create_session(user)
+
+    def restore_anonymous_session(self, *, recovery_key: str) -> AuthSession:
+        """
+        Restore an anonymous health tracking session using the private recovery key.
+        """
+        normalized_key = recovery_key.strip().upper()
+        user = self._store.get_by_recovery_key(normalized_key)
+        if user is None:
+            raise InvalidCredentialsError("Invalid or unknown Anonymous Recovery Key. Please verify and try again.")
+        return self._create_session(user)
+
+    def convert_anonymous_session(
+        self,
+        *,
+        user_id: str,
+        email: str,
+        password: str,
+        name: str,
+    ) -> AuthSession:
+        """
+        Convert an anonymous tracking account into a permanently registered email account
+        preserving all cycle logs, symptom entries, and health history.
+        """
+        user = self._store.get_by_id(user_id)
+        if user is None:
+            raise UserNotFoundError("User not found.")
+        if not user.is_anonymous:
+            raise AuthError("Account is already a registered account.")
+
+        converted_user = self._store.convert_anonymous_user(
+            user_id=user_id,
+            name=name,
+            email=email,
+            password=password,
+        )
+        return self._create_session(converted_user)
 
     def login_or_register_google(
         self,

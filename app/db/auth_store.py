@@ -38,11 +38,16 @@ class PostgresAuthStore:
                     created_at TEXT NOT NULL,
                     is_deleted INT NOT NULL DEFAULT 0,
                     deleted_at TEXT,
-                    deleted_email TEXT
+                    deleted_email TEXT,
+                    is_anonymous INT NOT NULL DEFAULT 0,
+                    recovery_key TEXT
                 )
                 """
             )
             conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+            conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_anonymous INT NOT NULL DEFAULT 0")
+            conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_key TEXT")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_users_recovery_key ON users(recovery_key)")
 
     def _row_to_user(self, row: dict) -> StoredUser:
         created_at = datetime.fromisoformat(row["created_at"])
@@ -50,6 +55,8 @@ class PostgresAuthStore:
             created_at = created_at.replace(tzinfo=timezone.utc)
 
         preferred_language = row["preferred_language"] if "preferred_language" in row.keys() else "english"
+        is_anonymous = bool(row.get("is_anonymous", 0))
+        recovery_key = row.get("recovery_key")
         return StoredUser(
             id=row["id"],
             name=row["name"],
@@ -58,6 +65,8 @@ class PostgresAuthStore:
             role=row["role"],
             preferred_language=preferred_language,
             created_at=created_at,
+            is_anonymous=is_anonymous,
+            recovery_key=recovery_key,
         )
 
     def create_user(
@@ -68,6 +77,8 @@ class PostgresAuthStore:
         password: str,
         role: str,
         preferred_language: str = "english",
+        is_anonymous: bool = False,
+        recovery_key: str | None = None,
     ) -> StoredUser:
         normalized_email = email.strip().lower()
         normalized_role = role.strip().lower()
@@ -75,13 +86,14 @@ class PostgresAuthStore:
         user_id = uuid4().hex
         created_at = datetime.now(timezone.utc).isoformat()
         password_hash = hash_password(password)
+        norm_recovery = recovery_key.strip().upper() if recovery_key else None
 
         try:
             with self._pool.connection(timeout=2.0) as conn:
                 conn.execute(
                     """
-                    INSERT INTO users (id, name, email, password_hash, role, preferred_language, created_at, deleted_email)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO users (id, name, email, password_hash, role, preferred_language, created_at, deleted_email, is_anonymous, recovery_key)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         user_id,
@@ -92,6 +104,8 @@ class PostgresAuthStore:
                         normalized_language,
                         created_at,
                         None,
+                        1 if is_anonymous else 0,
+                        norm_recovery,
                     ),
                 )
         except psycopg.IntegrityError as exc:
@@ -106,7 +120,7 @@ class PostgresAuthStore:
         with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
-                    "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE email = %s AND is_deleted = 0",
+                    "SELECT id, name, email, password_hash, role, preferred_language, created_at, is_anonymous, recovery_key FROM users WHERE email = %s AND is_deleted = 0",
                     (email.strip().lower(),),
                 ).fetchone()
         return None if row is None else self._row_to_user(row)
@@ -115,10 +129,45 @@ class PostgresAuthStore:
         with self._pool.connection(timeout=2.0) as conn:
             with conn.cursor(row_factory=dict_row) as cursor:
                 row = cursor.execute(
-                    "SELECT id, name, email, password_hash, role, preferred_language, created_at FROM users WHERE id = %s AND is_deleted = 0",
+                    "SELECT id, name, email, password_hash, role, preferred_language, created_at, is_anonymous, recovery_key FROM users WHERE id = %s AND is_deleted = 0",
                     (user_id,),
                 ).fetchone()
         return None if row is None else self._row_to_user(row)
+
+    def get_by_recovery_key(self, recovery_key: str) -> StoredUser | None:
+        with self._pool.connection(timeout=2.0) as conn:
+            with conn.cursor(row_factory=dict_row) as cursor:
+                row = cursor.execute(
+                    "SELECT id, name, email, password_hash, role, preferred_language, created_at, is_anonymous, recovery_key FROM users WHERE recovery_key = %s AND is_deleted = 0",
+                    (recovery_key.strip().upper(),),
+                ).fetchone()
+        return None if row is None else self._row_to_user(row)
+
+    def convert_anonymous_user(
+        self,
+        *,
+        user_id: str,
+        name: str,
+        email: str,
+        password: str,
+    ) -> StoredUser:
+        normalized_email = email.strip().lower()
+        password_hash = hash_password(password)
+        try:
+            with self._pool.connection(timeout=2.0) as conn:
+                cursor = conn.execute(
+                    "UPDATE users SET name = %s, email = %s, password_hash = %s, is_anonymous = 0, recovery_key = NULL WHERE id = %s AND is_deleted = 0",
+                    (name.strip(), normalized_email, password_hash, user_id),
+                )
+            if cursor.rowcount == 0:
+                raise UserNotFoundError("User not found.")
+        except psycopg.IntegrityError as exc:
+            raise DuplicateEmailError("An account already exists for this email.") from exc
+
+        user = self.get_by_id(user_id)
+        if user is None:
+            raise UserNotFoundError("User not found.")
+        return user
 
     def authenticate(self, *, email: str, password: str) -> StoredUser:
         user = self.get_by_email(email)
