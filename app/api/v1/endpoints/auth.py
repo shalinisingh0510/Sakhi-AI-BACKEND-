@@ -53,6 +53,7 @@ def register(
             email=payload.email,
             password=payload.password,
             role=payload.role,
+            preferred_language=payload.preferred_language or "english",
         )
     except DuplicateEmailError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc

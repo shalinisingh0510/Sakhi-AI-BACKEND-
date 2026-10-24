@@ -111,6 +111,7 @@ def send_message(
             message=payload.message,
             mode=payload.mode,
             health_context=health_context_dict,
+            preferred_language=payload.preferred_language,
         )
     except ConversationNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc

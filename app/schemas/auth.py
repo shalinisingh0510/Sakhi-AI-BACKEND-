@@ -20,6 +20,19 @@ SUPPORTED_LANGUAGES = (
     "odia",
 )
 
+LOCALE_TO_LANGUAGE: dict[str, str] = {
+    "en": "english",
+    "hi": "hindi",
+    "bn": "bengali",
+    "mr": "marathi",
+    "ta": "tamil",
+    "te": "telugu",
+    "kn": "kannada",
+    "gu": "gujarati",
+    "pa": "punjabi",
+    "or": "odia",
+}
+
 
 class PublicUser(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -39,6 +52,7 @@ class RegisterRequest(BaseModel):
     email: str = Field(min_length=5, max_length=254)
     password: str = Field(min_length=8, max_length=128)
     role: Literal["user", "admin"] = "user"
+    preferred_language: str | None = Field(default="english", max_length=32)
 
     @field_validator("name")
     @classmethod
@@ -62,6 +76,20 @@ class RegisterRequest(BaseModel):
         normalized = value.strip()
         if len(normalized) < 8:
             raise ValueError("Password must be at least 8 characters long.")
+        return normalized
+
+    @field_validator("preferred_language")
+    @classmethod
+    def normalize_preferred_language(cls, value: str | None) -> str:
+        if value is None:
+            return "english"
+        normalized = value.strip().lower()
+        if not normalized:
+            return "english"
+        if normalized in LOCALE_TO_LANGUAGE:
+            normalized = LOCALE_TO_LANGUAGE[normalized]
+        if normalized not in SUPPORTED_LANGUAGES:
+            return "english"
         return normalized
 
 
@@ -113,9 +141,8 @@ class UpdateProfileRequest(BaseModel):
         if not normalized:
             raise ValueError("Preferred language cannot be empty.")
             
-        locale_map = {"en": "english", "hi": "hindi", "mr": "marathi"}
-        if normalized in locale_map:
-            normalized = locale_map[normalized]
+        if normalized in LOCALE_TO_LANGUAGE:
+            normalized = LOCALE_TO_LANGUAGE[normalized]
             
         if normalized not in SUPPORTED_LANGUAGES:
             raise ValueError("Unsupported preferred language.")

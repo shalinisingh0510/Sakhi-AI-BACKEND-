@@ -15,8 +15,11 @@ REGISTER_USER = {
 }
 
 
-def build_client(database_url: str) -> TestClient:
-    settings = Settings(database_url=database_url)
+def build_client(database_url: str | Path) -> TestClient:
+    db_str = str(database_url)
+    if not (db_str.startswith("sqlite:") or db_str.startswith("postgresql:") or db_str.startswith("postgres:")):
+        db_str = f"sqlite:///{db_str}"
+    settings = Settings(database_url=db_str)
     return TestClient(create_app(settings=settings))
 
 
@@ -32,9 +35,8 @@ def _register_user(client: TestClient, email: str | None = None) -> str:
     return response.json()['access_token']
 
 
-def test_chat_message_creates_conversation_and_returns_temporary_reply(tmp_path: Path) -> None:
-    database_path = tmp_path / 'chat.sqlite3'
-    client = build_client(database_path)
+def test_chat_message_creates_conversation_and_returns_temporary_reply(test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _register_user(client)
 
     response = client.post(
@@ -53,10 +55,8 @@ def test_chat_message_creates_conversation_and_returns_temporary_reply(tmp_path:
     client.close()
 
 
-def test_chat_message_reuses_existing_conversation(tmp_path: Path) -> None:
-    database_path = tmp_path / 'chat-existing.sqlite3'
-    settings = Settings(database_url=f'sqlite:///{database_path}')
-    client = TestClient(create_app(settings=settings))
+def test_chat_message_reuses_existing_conversation(test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     token = _register_user(client)
     first_response = client.post(
@@ -79,9 +79,8 @@ def test_chat_message_reuses_existing_conversation(tmp_path: Path) -> None:
     assert "not a diagnosis" in payload['messages'][-1]['content']
 
 
-def test_chat_message_rejects_invalid_inputs(tmp_path: Path) -> None:
-    database_path = tmp_path / 'chat-validation.sqlite3'
-    client = build_client(database_path)
+def test_chat_message_rejects_invalid_inputs(test_db_url: str) -> None:
+    client = build_client(test_db_url)
     token = _register_user(client)
     headers = {'Authorization': f'Bearer {token}'}
 
@@ -101,9 +100,8 @@ def test_chat_message_rejects_invalid_inputs(tmp_path: Path) -> None:
     assert invalid_conversation_response.status_code == 422
 
 
-def test_chat_message_requires_authentication(tmp_path: Path) -> None:
-    database_path = tmp_path / 'chat-auth.sqlite3'
-    client = build_client(database_path)
+def test_chat_message_requires_authentication(test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     response = client.post(
         '/api/v1/chat/message',
@@ -113,9 +111,8 @@ def test_chat_message_requires_authentication(tmp_path: Path) -> None:
     assert response.status_code == 401
 
 
-def test_chat_message_enforces_conversation_ownership(tmp_path: Path) -> None:
-    database_path = tmp_path / 'chat-ownership.sqlite3'
-    client = build_client(database_path)
+def test_chat_message_enforces_conversation_ownership(test_db_url: str) -> None:
+    client = build_client(test_db_url)
 
     owner_token = _register_user(client, email=f'owner_{uuid.uuid4().hex[:8]}@sakhi.ai')
     owner_headers = {'Authorization': f'Bearer {owner_token}'}

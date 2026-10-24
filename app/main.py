@@ -90,7 +90,7 @@ def create_app(
         try:
             db_pool.open(wait=True, timeout=10.0)
         except Exception as e:
-            logger.warning(f"Could not synchronously pre-warm db_pool: {e}")
+            startup_logger.warning(f"Could not synchronously pre-warm db_pool: {e}")
         app.state.db_pool = db_pool
 
         # Initialise SQLAlchemy engine (used by health domain and future ORM-backed services).

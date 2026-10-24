@@ -241,16 +241,19 @@ class AIService:
         message: str,
         mode: str = "text",
         health_context: dict | None = None,
+        preferred_language: str | None = None,
     ) -> ConversationDetail:
         conversation = self._require_owned_conversation(user_id=user_id, conversation_id=conversation_id)
         self._store.add_message(conversation_id=conversation.id, role="user", content=message)
         # Build recent history for context-aware replies (respects history limit)
         history = self._build_history(conversation_id=conversation.id, exclude_last_n=1)
         
+        target_language = self._normalize_language(preferred_language) if preferred_language else conversation.preferred_language
+
         reply_response = self._generate_orchestrated_reply(
             user_message=message,
             conversation_title=conversation.title,
-            preferred_language=conversation.preferred_language,
+            preferred_language=target_language,
             history=history,
             mode=mode,
             health_context=health_context

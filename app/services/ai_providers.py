@@ -99,6 +99,42 @@ class RuleBasedProvider:
         message = user_message.lower()
         history_note = f"We are continuing the conversation titled '{conversation_title}'."
 
+        is_hindi = preferred_language.strip().lower() in ("hindi", "hi")
+
+        if is_hindi:
+            if any(k in message for k in ("period", "menstrual", "cramp", "cycle", "दर्द", "माहवारी", "पीरियड", "ऐंठन")):
+                body = (
+                    "नमस्ते! स्वास्थ्य मार्गदर्शन: पीरियड्स के दौरान हल्की ऐंठन या पेल्विक तनाव सामान्य जैविक प्रक्रिया है। "
+                    "गर्म पानी की थैली से सिकाई, गुनगुना पानी और कैमोमाइल चाय से आराम मिलता है। "
+                    "यदि दर्द असहनीय हो या असामान्य रक्तस्राव हो, तो कृपया चिकित्सक से परामर्श लें।"
+                )
+            elif any(k in message for k in ("pregnan", "baby", "fertility", "ovulation", "गर्भावस्था", "ओव्यूलेशन", "फर्टिलिटी")):
+                body = (
+                    "नमस्ते! प्रजनन स्वास्थ्य मार्गदर्शन: ओव्यूलेशन और फर्टिलिटी के बारे में सही समझ स्वस्थ जीवन की कुंजी है। "
+                    "अपनी फर्टाइल विंडो को समझने के लिए हमारे ओव्यूलेशन कैलकुलेटर का उपयोग करें। "
+                    "यदि कोई विशेष लक्षण या चिंता हो, तो स्वास्थ्य विशेषज्ञ से परामर्श लें।"
+                )
+            elif any(k in message for k in ("stress", "anxious", "anxiety", "sad", "तनाव", "चिंता", "उदास")):
+                body = (
+                    "नमस्ते! मानसिक स्वास्थ्य मार्गदर्शन: तनाव और हॉर्मोनल उतार-चढ़ाव एक-दूसरे से जुड़े होते हैं। "
+                    "गहरी सांस लेने का व्यायाम करें, 8 घंटे की अच्छी नींद लें और अपने किसी करीबी से बात करें।"
+                )
+            elif any(k in message for k in ("hygiene", "itch", "discharge", "खुजली", "सफाई", "सफेद पानी")):
+                body = (
+                    "नमस्ते! स्वच्छता मार्गदर्शन: इंटीमेट हाइजीन बनाए रखना बेहद ज़रूरी है। सूती अंतःवस्त्र पहनें, "
+                    "क्षेत्र को साफ व सूखा रखें और खुशबूदार रसायनों के इस्तेमाल से बचें।"
+                )
+            else:
+                body = (
+                    "नमस्ते प्यारी सखी! मैं सखी एआई हूँ, आपकी व्यक्तिगत स्वास्थ्य साथी। "
+                    "मासिक धर्म चक्र, पोषण, स्वास्थ्य ट्रैकिंग और कल्याण से जुड़े किसी भी सवाल के लिए मैं हमेशा उपलब्ध हूँ।"
+                )
+            from app.schemas.ai import StructuredAIResponse
+            return StructuredAIResponse(
+                answer=f"{history_note} {body} यह जानकारी केवल शैक्षिक उद्देश्य के लिए है और चिकित्सीय सलाह नहीं है।",
+                citations=[]
+            )
+
         if any(k in message for k in ("period", "menstrual", "cramp", "cycle")):
             body = (
                 "Educational guidance: menstrual cramps and cycle changes are common, but severe pain, "

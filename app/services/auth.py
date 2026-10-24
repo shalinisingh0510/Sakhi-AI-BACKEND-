@@ -305,12 +305,26 @@ class AuthService:
     def secret_key(self) -> str:
         return self._settings.secret_key.get_secret_value()
 
-    def register_user(self, *, name: str, email: str, password: str, role: str = "user") -> AuthSession:
+    def register_user(
+        self,
+        *,
+        name: str,
+        email: str,
+        password: str,
+        role: str = "user",
+        preferred_language: str = "english",
+    ) -> AuthSession:
         normalized_role = role.strip().lower()
         if normalized_role not in REGISTRABLE_ROLES:
             raise InvalidRoleError("Unsupported user role.")
 
-        user = self._store.create_user(name=name, email=email, password=password, role=normalized_role)
+        user = self._store.create_user(
+            name=name,
+            email=email,
+            password=password,
+            role=normalized_role,
+            preferred_language=preferred_language,
+        )
         return self._create_session(user)
 
     def login_user(self, *, email: str, password: str) -> AuthSession:

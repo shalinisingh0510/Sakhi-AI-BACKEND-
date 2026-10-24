@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.schemas.auth import SUPPORTED_LANGUAGES
+from app.schemas.auth import SUPPORTED_LANGUAGES, LOCALE_TO_LANGUAGE
 
 
 class Citation(BaseModel):
@@ -83,9 +83,8 @@ class CreateConversationRequest(BaseModel):
         if not normalized:
             return None
             
-        locale_map = {"en": "english", "hi": "hindi", "mr": "marathi"}
-        if normalized in locale_map:
-            normalized = locale_map[normalized]
+        if normalized in LOCALE_TO_LANGUAGE:
+            normalized = LOCALE_TO_LANGUAGE[normalized]
             
         if normalized not in SUPPORTED_LANGUAGES:
             raise ValueError("Unsupported preferred language.")
@@ -97,6 +96,7 @@ class SendMessageRequest(BaseModel):
     
     message: str = Field(min_length=1, max_length=4000)
     mode: Literal["text", "voice"] = "text"
+    preferred_language: str | None = Field(default=None, max_length=32)
 
     @field_validator("message")
     @classmethod
@@ -104,4 +104,20 @@ class SendMessageRequest(BaseModel):
         normalized = value.strip()
         if not normalized:
             raise ValueError("Message is required.")
+        return normalized
+
+    @field_validator("preferred_language")
+    @classmethod
+    def normalize_preferred_language(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        if not normalized:
+            return None
+            
+        if normalized in LOCALE_TO_LANGUAGE:
+            normalized = LOCALE_TO_LANGUAGE[normalized]
+            
+        if normalized not in SUPPORTED_LANGUAGES:
+            return None
         return normalized
