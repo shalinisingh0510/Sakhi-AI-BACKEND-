@@ -113,7 +113,7 @@ def create_anonymous_session(
     auth_service: AuthService = Depends(get_auth_service),
 ) -> AuthResponse:
     """
-    Flo Health-inspired Anonymous Mode.
+    Sakhi AI Anonymous Mode.
     Creates a private session decoupled from user identity with zero personal identifiers.
     Returns standard access & refresh JWT tokens and a private recovery key.
     """

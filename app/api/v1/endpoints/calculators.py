@@ -35,7 +35,7 @@ router = APIRouter(prefix="/calculators", tags=["Calculators & Health Tools"])
     "/catalog",
     response_model=CalculatorCatalogResponse,
     summary="Get all available calculators and health tools",
-    description="Returns metadata, categories, slugs, and details for all Flo Health style calculators.",
+    description="Returns metadata, categories, slugs, and details for all Sakhi AI health calculators.",
 )
 def get_catalog() -> CalculatorCatalogResponse:
     catalog = CalculatorService.get_catalog()

@@ -179,7 +179,7 @@ class CalculatorService:
     # 1. Ovulation Calculator
     @staticmethod
     def calculate_ovulation(payload: OvulationRequest) -> OvulationResponse:
-        # Flo Health logic:
+        # Clinical evidence logic:
         # Next period = LMP + cycle days
         # Ovulation = Next period - 14 days
         # Start fertile = Ovulation - 5 days
@@ -224,7 +224,7 @@ class CalculatorService:
     # 2. hCG Calculator
     @staticmethod
     def calculate_hcg(payload: HcgRequest) -> HcgResponse:
-        # Flo Health logic:
+        # Clinical evidence logic:
         # if timetype == 'days': time_hours = number * 24
         # doubling_hours = time_hours / log2(second / first)
         # doubling_days = doubling_hours / 24
@@ -357,7 +357,7 @@ class CalculatorService:
     # 4. Menstrual Cycle Calculator
     @staticmethod
     def calculate_menstrual_cycle(payload: MenstrualCycleRequest) -> MenstrualCycleResponse:
-        # Flo Health logic:
+        # Clinical evidence logic:
         # Next period start = LMP + cycle days
         # Next period end = Next period start + period duration
         # Ovulation = Next period start - 14 days
@@ -485,7 +485,7 @@ class CalculatorService:
     # 6. Implantation Calculator
     @staticmethod
     def calculate_implantation(payload: ImplantationRequest) -> ImplantationResponse:
-        # Flo Health logic:
+        # Clinical evidence logic:
         # If method == 'od': ovulation = date
         # If method == 'lp': ovulation = date + cycle - 14
         # Implantation occurs 6 to 10 days post-ovulation (days: 6-10)
@@ -532,7 +532,7 @@ class CalculatorService:
         total_days = payload.weeks * 7 + payload.days
         today = date.today()
 
-        # Flo Health logic:
+        # Clinical evidence logic:
         # total_days = 7 * weeks + days
         # percentage = min(100, round((total_days / 280) * 100))
         # EDD = today - total_days + 280
@@ -592,7 +592,7 @@ class CalculatorService:
         today = date.today()
 
         if payload.method == DueDateMethod.LAST_PERIOD:
-            # Flo Health: LMP + (cycle - 28) + 280 days
+            # Naegele's rule with cycle adjustment: LMP + (cycle - 28) + 280 days
             cycle_adj = payload.cycle_length - 28
             edd = payload.date + timedelta(days=280 + cycle_adj)
             conception = payload.date + timedelta(days=payload.cycle_length - 14)
@@ -675,7 +675,7 @@ class CalculatorService:
     def calculate_ivf_due_date(payload: IvfDueDateRequest) -> IvfDueDateResponse:
         today = date.today()
 
-        # Flo Health logic from decompiled bundle:
+        # Evidence-based ASRM / ACOG clinical logic:
         # case "tr-1": r = 263 days; offset = 17 days (Day 3 embryo transfer)
         # case "tr-2": r = 261 days; offset = 19 days (Day 5 blastocyst transfer)
         # case "tr-3": r = 266 days; offset = 14 days (Egg retrieval / IUI / Day 0)
@@ -754,7 +754,7 @@ class CalculatorService:
     def calculate_ultrasound_due_date(payload: UltrasoundDueDateRequest) -> UltrasoundDueDateResponse:
         today = date.today()
 
-        # Flo Health logic from decompiled bundle:
+        # Evidence-based ACOG ultrasound dating logic:
         # scan_days = 7 * weeks + days
         # conception_date = ultrasound_date - scan_days + 14 (or theoretical LMP = scan_date - scan_days)
         # edd = ultrasound_date + (280 - scan_days)

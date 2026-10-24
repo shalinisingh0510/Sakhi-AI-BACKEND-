@@ -322,7 +322,7 @@ class AuthService:
 
     def create_anonymous_session(self, *, preferred_language: str = "english") -> AuthSession:
         """
-        Flo Health-inspired Anonymous Mode:
+        Sakhi AI Anonymous Mode:
         Creates a private decoupled session with zero personal identifiers.
         Generates a secure recovery key so the user can backup/restore health data
         without linking an email or social account.
